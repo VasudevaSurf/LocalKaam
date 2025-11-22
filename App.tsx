@@ -9,6 +9,9 @@ import {
   LocationSetupScreen,
 } from './src/screens/onboarding';
 
+// Auth Screens
+import { PhoneNumberScreen, OTPVerificationScreen } from './src/screens/auth';
+
 // Main App Container
 import { MainApp } from './src/containers/MainApp';
 
@@ -43,6 +46,8 @@ import {
 type AppScreen =
   | 'splash'
   | 'welcome'
+  | 'phoneNumber'
+  | 'otpVerification'
   | 'locationSetup'
   | 'mainApp'
   | 'requestService'
@@ -71,21 +76,66 @@ function App(): React.JSX.Element {
   // Render current screen
   const renderScreen = () => {
     switch (currentScreen) {
-      // ============ ONBOARDING ============
+      // ============ ONBOARDING FLOW ============
+      // Step 1: Splash
       case 'splash':
-        return <SplashScreen onComplete={() => navigateTo('welcome')} />;
-
-      case 'welcome':
         return (
-          <WelcomeScreen onGetStarted={() => navigateTo('locationSetup')} />
+          <SplashScreen
+            onComplete={() => {
+              // Check if user is logged in (you'd check AsyncStorage here)
+              const isLoggedIn = false; // Replace with actual check from AsyncStorage
+              if (isLoggedIn) {
+                navigateTo('mainApp');
+              } else {
+                navigateTo('welcome'); // Go to welcome for new users
+              }
+            }}
+          />
         );
 
+      // Step 2: Welcome (3 slides)
+      case 'welcome':
+        return (
+          <WelcomeScreen
+            onGetStarted={() => navigateTo('phoneNumber')} // Then phone number
+          />
+        );
+
+      // ============ AUTH FLOW ============
+      // Step 3: Phone Number Entry
+      case 'phoneNumber':
+        return (
+          <PhoneNumberScreen
+            onSendOTP={phoneNumber => {
+              console.log('Sending OTP to:', phoneNumber);
+              navigateTo('otpVerification', { phoneNumber });
+            }}
+          />
+        );
+
+      // Step 4: OTP Verification
+      case 'otpVerification':
+        return (
+          <OTPVerificationScreen
+            phoneNumber={screenParams.phoneNumber}
+            onVerifyOTP={otp => {
+              console.log('OTP verified:', otp);
+              // After OTP verification, go to location setup
+              navigateTo('locationSetup');
+            }}
+            onResendOTP={() => console.log('Resending OTP...')}
+            onBack={() => navigateTo('phoneNumber')}
+          />
+        );
+
+      // Step 5: Location Setup
       case 'locationSetup':
         return (
           <LocationSetupScreen
             onComplete={location => {
               console.log('Location set:', location);
-              navigateTo('mainApp');
+              // Save to AsyncStorage here
+              navigateTo('mainApp'); // Finally go to main app
             }}
           />
         );
@@ -135,7 +185,10 @@ function App(): React.JSX.Element {
             onAbout={() => console.log('About')}
             onPrivacyPolicy={() => console.log('Privacy')}
             onTermsConditions={() => console.log('Terms')}
-            onLogout={() => navigateTo('welcome')}
+            onLogout={() => {
+              // Clear AsyncStorage here
+              navigateTo('welcome'); // Go back to welcome
+            }}
           />
         );
 
@@ -200,7 +253,6 @@ function App(): React.JSX.Element {
             {...screenParams}
             onConfirmBooking={bookingDetails => {
               console.log('Booking:', bookingDetails);
-              // Go directly to active booking with OTP
               navigateTo('activeBooking', {
                 bookingId: '123',
                 workerName: screenParams.workerName,
