@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,33 +8,76 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import {styles} from './PhoneNumberScreen.styles';
-import {Input} from '../../../components/ui/Input';
-import {Button} from '../../../components/ui/Button';
+import { getAuth, signInWithPhoneNumber } from '@react-native-firebase/auth';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AuthStackParamList } from '../../../navigation/types';
+import { styles } from './PhoneNumberScreen.styles';
+import { Input } from '../../../components/ui/Input';
+import { Button } from '../../../components/ui/Button';
 
-export interface PhoneNumberScreenProps {
-  onSendOTP: (phoneNumber: string) => void;
-}
+type PhoneNumberScreenNavigationProp = NativeStackNavigationProp<
+  AuthStackParamList,
+  'PhoneNumber'
+>;
 
-export const PhoneNumberScreen: React.FC<PhoneNumberScreenProps> = ({
-  onSendOTP,
-}) => {
+export const PhoneNumberScreen: React.FC = () => {
+  const navigation = useNavigation<PhoneNumberScreenNavigationProp>();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSendOTP = () => {
+  const handleSendOTP = async () => {
     // Validate phone number
     if (phoneNumber.length !== 10) {
-      Alert.alert('Invalid Number', 'Please enter a valid 10-digit mobile number');
+      Alert.alert(
+        'Invalid Number',
+        'Please enter a valid 10-digit mobile number',
+      );
       return;
     }
 
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const formattedPhone = `+91${phoneNumber}`;
+      console.log('Sending OTP to:', formattedPhone);
+
+      // Add 60s timeout to prevent infinite loading
+      const confirmation = await Promise.race([
+        signInWithPhoneNumber(getAuth(), formattedPhone),
+        new Promise<any>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error('Request timed out. Please check your connection.'),
+              ),
+            60000,
+          ),
+        ),
+      ]);
+
       setLoading(false);
-      onSendOTP(phoneNumber);
-    }, 1000);
+      navigation.navigate('OTPVerification', { phoneNumber, confirmation });
+    } catch (error: any) {
+      setLoading(false);
+      console.error('Error sending OTP:', error);
+
+      let errorMessage = 'Failed to send OTP. Please try again.';
+
+      if (error.message?.includes('timeout')) {
+        errorMessage =
+          'Request timed out. Please add SHA-1 fingerprint to Firebase Console (see guide).';
+      } else if (error.code === 'auth/invalid-phone-number') {
+        errorMessage = 'The phone number is invalid.';
+      } else if (error.code === 'auth/quota-exceeded') {
+        errorMessage = 'SMS quota exceeded. Please try again later.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your internet connection.';
+      }
+
+      setTimeout(() => {
+        Alert.alert('Error', errorMessage);
+      }, 500);
+    }
   };
 
   const handlePhoneChange = (text: string) => {
@@ -49,18 +92,20 @@ export const PhoneNumberScreen: React.FC<PhoneNumberScreenProps> = ({
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}>
+        style={styles.keyboardView}
+      >
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled">
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Logo/Icon */}
           <View style={styles.iconContainer}>
             <Text style={styles.icon}>🔧</Text>
           </View>
 
           {/* Title */}
-          <Text style={styles.title}>Welcome to SkillProof</Text>
+          <Text style={styles.title}>Welcome to LocalKaam</Text>
           <Text style={styles.subtitle}>
             Enter your mobile number to get started
           </Text>

@@ -8,6 +8,9 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 import { styles } from './WorkerProfileScreen.styles';
 import { Header } from '../../../components/common/Header';
 import { Button } from '../../../components/ui/Button';
@@ -15,6 +18,7 @@ import { Badge } from '../../../components/ui/Badge';
 import { Avatar } from '../../../components/ui/Avatar';
 import { Card } from '../../../components/ui/Card';
 import { Divider } from '../../../components/common/Divider';
+import { Linking, Share, Alert } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -90,29 +94,56 @@ const MOCK_WORKER = {
       images: [],
     },
   ],
+  phone: '+919876543210', // Mock phone
 };
 
-export interface WorkerProfileScreenProps {
-  workerId: string;
-  onBack: () => void;
-  onHireNow: () => void;
-  onSendMessage: () => void;
-  onCall: () => void;
-  onShare: () => void;
-}
+type WorkerProfileScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'WorkerProfile'
+>;
 
-export const WorkerProfileScreen: React.FC<WorkerProfileScreenProps> = ({
-  workerId,
-  onBack,
-  onHireNow,
-  onSendMessage,
-  onCall,
-  onShare,
-}) => {
+type WorkerProfileScreenRouteProp = RouteProp<
+  RootStackParamList,
+  'WorkerProfile'
+>;
+
+export const WorkerProfileScreen: React.FC = () => {
+  const navigation = useNavigation<WorkerProfileScreenNavigationProp>();
+  const route = useRoute<WorkerProfileScreenRouteProp>();
+  const { workerId } = route.params;
+
   const [selectedTab, setSelectedTab] = useState<'about' | 'work' | 'reviews'>(
     'about',
   );
-  const worker = MOCK_WORKER;
+  const worker = MOCK_WORKER; // In real app, fetch by workerId
+
+  const handleHireNow = () => {
+    navigation.navigate('BookingConfirmation', {
+      workerId: worker.id,
+      workerName: worker.name,
+      service: worker.service,
+      basePrice: worker.price,
+    });
+  };
+
+  const handleSendMessage = () => {
+    console.log('Navigate to chat with', worker.id);
+    // navigation.navigate('Chat', { userId: worker.id });
+  };
+
+  const handleCall = () => {
+    Linking.openURL(`tel:${worker.phone}`);
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Check out ${worker.name}, a professional ${worker.service} on LocalKaam!`,
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Could not share profile');
+    }
+  };
 
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
@@ -127,8 +158,8 @@ export const WorkerProfileScreen: React.FC<WorkerProfileScreenProps> = ({
       <Header
         leftIcon={<Text style={styles.backIcon}>←</Text>}
         rightIcon={<Text style={styles.shareIcon}>↗️</Text>}
-        onLeftPress={onBack}
-        onRightPress={onShare}
+        onLeftPress={() => navigation.goBack()}
+        onRightPress={handleShare}
         transparent
       />
 
@@ -450,21 +481,21 @@ export const WorkerProfileScreen: React.FC<WorkerProfileScreenProps> = ({
             title="📞"
             variant="outline"
             size="large"
-            onPress={onCall}
+            onPress={handleCall}
             style={styles.callButton}
           />
           <Button
             title="💬"
             variant="outline"
             size="large"
-            onPress={onSendMessage}
+            onPress={handleSendMessage}
             style={styles.messageButton}
           />
           <Button
             title="Hire Now"
             variant="primary"
             size="large"
-            onPress={onHireNow}
+            onPress={handleHireNow}
             style={styles.hireButton}
           />
         </View>

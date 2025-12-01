@@ -1,89 +1,55 @@
+export type AuthStackParamList = {
+  Welcome: undefined;
+  PhoneNumber: undefined;
+  OTPVerification: { phoneNumber: string; confirmation: any };
+};
+
+export type MainTabParamList = {
+  Home: undefined;
+  Browse: undefined;
+  Bookings: undefined;
+  Profile: undefined;
+};
+
 export type RootStackParamList = {
-  // Onboarding
-  Splash: undefined;
-  Welcome: undefined;
-  ServiceSelection: undefined;
-  LocationSetup: undefined;
+  Auth: undefined;
+  Main: undefined;
+  CustomerProfileSetup: undefined;
+  LocationSetup: { name: string; bio: string; profileImage?: string };
 
-  // Main App
-  Home: undefined;
-
-  // Request Flow
-  RequestService: undefined;
-  ActiveRequest: {
-    requestId: string;
-  };
-
-  // Browse Flow
-  BrowseServices: undefined;
-  WorkerProfile: {
-    workerId: string;
-  };
-
-  // Booking Flow
-  BookingConfirmation: {
-    workerId: string;
-    workerName: string;
-    workerImage?: string;
-    service: string;
-    basePrice: string;
-  };
-  PaymentOTP: {
-    bookingId: string;
-    workerName: string;
-    workerImage?: string;
-    service: string;
-    amount: number;
-    workerPhone: string;
-  };
-  PaymentSuccess: {
-    bookingId: string;
-    workerName: string;
-    workerImage?: string;
-    service: string;
-    amount: number;
-    date: string;
-  };
-
-  // Bookings
-  MyBookings: undefined;
-};
-
-export type OnboardingStackParamList = {
-  Splash: undefined;
-  Welcome: undefined;
-  ServiceSelection: undefined;
-  LocationSetup: undefined;
-};
-
-export type MainStackParamList = {
-  Home: undefined;
+  // Feature Screens
   RequestService: undefined;
   ActiveRequest: { requestId: string };
-  BrowseServices: undefined;
   WorkerProfile: { workerId: string };
   BookingConfirmation: {
     workerId: string;
     workerName: string;
-    workerImage?: string;
     service: string;
     basePrice: string;
   };
-  PaymentOTP: {
+  ActiveBooking: {
     bookingId: string;
     workerName: string;
-    workerImage?: string;
-    service: string;
-    amount: number;
     workerPhone: string;
+    service: string;
+    location: string;
+    scheduledDate: string;
+    scheduledTime: string;
+    amount: number;
+    otp: string;
+    status: string;
   };
   PaymentSuccess: {
     bookingId: string;
     workerName: string;
-    workerImage?: string;
     service: string;
     amount: number;
     date: string;
   };
-  MyBookings: undefined;
+  EditProfile: undefined;
+  SavedWorkers: undefined;
+  PaymentHistory: undefined;
+  Notifications: undefined;
+  Settings: undefined;
+  HelpSupport: undefined;
 };

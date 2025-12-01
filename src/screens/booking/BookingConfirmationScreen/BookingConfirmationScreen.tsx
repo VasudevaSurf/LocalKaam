@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 import { styles } from './BookingConfirmationScreen.styles';
 import { Header } from '../../../components/common/Header';
 import { Card } from '../../../components/ui/Card';
@@ -24,27 +27,22 @@ const SCHEDULE_OPTIONS = [
   { id: 'custom', label: 'Pick Date', subtitle: 'Choose date & time' },
 ];
 
-export interface BookingConfirmationScreenProps {
-  workerId: string;
-  workerName: string;
-  workerImage?: string;
-  service: string;
-  basePrice: string;
-  onConfirmBooking: (bookingDetails: any) => void;
-  onBack: () => void;
-}
+type BookingConfirmationScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'BookingConfirmation'
+>;
 
-export const BookingConfirmationScreen: React.FC<
-  BookingConfirmationScreenProps
-> = ({
-  workerId,
-  workerName,
-  workerImage,
-  service,
-  basePrice,
-  onConfirmBooking,
-  onBack,
-}) => {
+type BookingConfirmationScreenRouteProp = RouteProp<
+  RootStackParamList,
+  'BookingConfirmation'
+>;
+
+export const BookingConfirmationScreen: React.FC = () => {
+  const navigation = useNavigation<BookingConfirmationScreenNavigationProp>();
+  const route = useRoute<BookingConfirmationScreenRouteProp>();
+  const { workerId, workerName, service, basePrice } = route.params;
+  const workerImage = undefined; // Or pass from params if available
+
   const [selectedSchedule, setSelectedSchedule] = useState('asap');
   const [location, setLocation] = useState('Model Town, Ludhiana');
   const [description, setDescription] = useState('');
@@ -63,20 +61,26 @@ export const BookingConfirmationScreen: React.FC<
       return;
     }
 
+    const totalAmount = calculateTotal();
+    const bookingId = 'bk_' + Date.now();
+
     const bookingDetails = {
-      workerId,
+      bookingId,
       workerName,
+      workerPhone: '+919876543210', // Mock
       service,
-      schedule: selectedSchedule,
       location,
-      description: description.trim(),
-      estimatedDays: parseInt(estimatedDays),
-      notes: notes.trim(),
-      agreedPrice: calculateTotal(),
-      timestamp: new Date(),
+      scheduledDate: new Date().toLocaleDateString(),
+      scheduledTime: '10:00 AM', // Mock
+      amount: totalAmount,
+      otp: '1234',
+      status: 'confirmed',
     };
 
-    onConfirmBooking(bookingDetails);
+    // TODO: Call API to create booking
+    console.log('Confirming booking:', bookingDetails);
+
+    navigation.navigate('ActiveBooking', bookingDetails);
   };
 
   return (
@@ -84,7 +88,7 @@ export const BookingConfirmationScreen: React.FC<
       <Header
         title="Confirm Booking"
         leftIcon={<Text style={styles.backIcon}>←</Text>}
-        onLeftPress={onBack}
+        onLeftPress={() => navigation.goBack()}
       />
 
       <ScrollView

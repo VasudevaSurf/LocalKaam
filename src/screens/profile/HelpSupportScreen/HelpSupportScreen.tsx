@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   Linking,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 import { styles } from './HelpSupportScreen.styles';
 import { Header } from '../../../components/common/Header';
 import { Card } from '../../../components/ui/Card';
@@ -60,13 +63,13 @@ const MOCK_FAQS: FAQ[] = [
   },
 ];
 
-export interface HelpSupportScreenProps {
-  onBack: () => void;
-}
+type HelpSupportScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'HelpSupport'
+>;
 
-export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({
-  onBack,
-}) => {
+export const HelpSupportScreen: React.FC = () => {
+  const navigation = useNavigation<HelpSupportScreenNavigationProp>();
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
   const [message, setMessage] = useState('');
 
@@ -98,7 +101,7 @@ export const HelpSupportScreen: React.FC<HelpSupportScreenProps> = ({
       <Header
         title="Help & Support"
         leftIcon={<Text style={styles.backIcon}>←</Text>}
-        onLeftPress={onBack}
+        onLeftPress={() => navigation.goBack()}
       />
 
       <ScrollView

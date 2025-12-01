@@ -7,41 +7,39 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { styles } from './EditProfileScreen.styles';
 import { Header } from '../../../components/common/Header';
 import { Avatar } from '../../../components/ui/Avatar';
 import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
+import { useAuth } from '../../../context/AuthContext';
 
-export interface EditProfileScreenProps {
-  userName: string;
-  userPhone: string;
-  userEmail?: string;
-  userImage?: string;
-  onSave: (data: { name: string; email: string }) => void;
-  onChangePhoto: () => void;
-  onBack: () => void;
-}
+export const EditProfileScreen: React.FC = () => {
+  const navigation = useNavigation();
+  const { user, updateProfile } = useAuth();
 
-export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
-  userName,
-  userPhone,
-  userEmail,
-  userImage,
-  onSave,
-  onChangePhoto,
-  onBack,
-}) => {
-  const [name, setName] = useState(userName);
-  const [email, setEmail] = useState(userEmail || '');
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert('Error', 'Please enter your name');
       return;
     }
 
-    onSave({ name: name.trim(), email: email.trim() });
+    try {
+      await updateProfile({ name: name.trim(), email: email.trim() });
+      Alert.alert('Success', 'Profile updated successfully', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update profile');
+    }
+  };
+
+  const handleChangePhoto = () => {
+    Alert.alert('Coming Soon', 'Photo upload coming soon');
   };
 
   return (
@@ -49,7 +47,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
       <Header
         title="Edit Profile"
         leftIcon={<Text style={styles.backIcon}>←</Text>}
-        onLeftPress={onBack}
+        onLeftPress={() => navigation.goBack()}
       />
 
       <ScrollView
@@ -60,13 +58,13 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
         {/* Profile Photo */}
         <View style={styles.photoSection}>
           <Avatar
-            source={userImage ? { uri: userImage } : undefined}
+            source={user?.profileImage ? { uri: user.profileImage } : undefined}
             name={name}
             size="xl"
           />
           <TouchableOpacity
             style={styles.changePhotoButton}
-            onPress={onChangePhoto}
+            onPress={handleChangePhoto}
           >
             <Text style={styles.changePhotoText}>Change Photo</Text>
           </TouchableOpacity>
@@ -85,7 +83,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
           <Input
             label="Phone Number"
             placeholder="Phone number"
-            value={userPhone}
+            value={user?.phoneNumber || ''}
             editable={false}
             leftIcon={<Text style={styles.inputIcon}>📞</Text>}
             containerStyle={styles.disabledInput}

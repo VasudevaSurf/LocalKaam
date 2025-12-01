@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 import { styles } from './RequestServiceScreen.styles';
 import { Header } from '../../../components/common/Header';
 import { Input } from '../../../components/ui/Input';
@@ -32,15 +35,13 @@ const URGENCY_OPTIONS = [
   { id: 'scheduled', label: 'Schedule', subtitle: 'Pick a date' },
 ];
 
-export interface RequestServiceScreenProps {
-  onRequestSubmit: (request: any) => void;
-  onBack: () => void;
-}
+type RequestServiceScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'RequestService'
+>;
 
-export const RequestServiceScreen: React.FC<RequestServiceScreenProps> = ({
-  onRequestSubmit,
-  onBack,
-}) => {
+export const RequestServiceScreen: React.FC = () => {
+  const navigation = useNavigation<RequestServiceScreenNavigationProp>();
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('Model Town, Ludhiana');
@@ -70,7 +71,13 @@ export const RequestServiceScreen: React.FC<RequestServiceScreenProps> = ({
       timestamp: new Date(),
     };
 
-    onRequestSubmit(request);
+    // TODO: Call API to create request
+    console.log('Submitting request:', request);
+
+    // Simulate API call success and navigate
+    // In real app, get requestId from response
+    const mockRequestId = 'req_' + Date.now();
+    navigation.navigate('ActiveRequest', { requestId: mockRequestId });
   };
 
   const serviceName =
@@ -81,7 +88,7 @@ export const RequestServiceScreen: React.FC<RequestServiceScreenProps> = ({
       <Header
         title="Request a Service"
         leftIcon={<Text style={styles.backIcon}>←</Text>}
-        onLeftPress={onBack}
+        onLeftPress={() => navigation.goBack()}
       />
 
       <ScrollView

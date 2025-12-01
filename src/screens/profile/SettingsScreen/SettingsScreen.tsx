@@ -7,10 +7,14 @@ import {
   Switch,
   TouchableOpacity,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 import { styles } from './SettingsScreen.styles';
 import { Header } from '../../../components/common/Header';
 import { Card } from '../../../components/ui/Card';
 import { Divider } from '../../../components/common/Divider';
+import { Alert } from 'react-native';
 
 interface SettingToggle {
   id: string;
@@ -28,21 +32,30 @@ interface SettingOption {
   onPress: () => void;
 }
 
-export interface SettingsScreenProps {
-  onBack: () => void;
-  onChangeLanguage: () => void;
-  onChangeLocation: () => void;
-  onManageBlockedWorkers: () => void;
-  onClearCache: () => void;
-}
+type SettingsScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'Settings'
+>;
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({
-  onBack,
-  onChangeLanguage,
-  onChangeLocation,
-  onManageBlockedWorkers,
-  onClearCache,
-}) => {
+export const SettingsScreen: React.FC = () => {
+  const navigation = useNavigation<SettingsScreenNavigationProp>();
+
+  const handleChangeLanguage = () => {
+    Alert.alert('Language', 'Language selection coming soon');
+  };
+
+  const handleChangeLocation = () => {
+    // navigation.navigate('LocationSetup');
+    Alert.alert('Location', 'Location settings coming soon');
+  };
+
+  const handleManageBlockedWorkers = () => {
+    Alert.alert('Blocked Workers', 'Blocked workers list coming soon');
+  };
+
+  const handleClearCache = () => {
+    Alert.alert('Success', 'Cache cleared successfully');
+  };
   // Notification Settings
   const [pushNotifications, setPushNotifications] = useState(true);
   const [bookingUpdates, setBookingUpdates] = useState(true);
@@ -136,14 +149,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       label: 'Language',
       description: 'English',
       value: 'English',
-      onPress: onChangeLanguage,
+      onPress: handleChangeLanguage,
     },
     {
       id: 'location',
       label: 'Default Location',
       description: 'Model Town, Ludhiana',
       value: 'Model Town, Ludhiana',
-      onPress: onChangeLocation,
+      onPress: handleChangeLocation,
     },
   ];
 
@@ -184,7 +197,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       <Header
         title="Settings"
         leftIcon={<Text style={styles.backIcon}>←</Text>}
-        onLeftPress={onBack}
+        onLeftPress={() => navigation.goBack()}
       />
 
       <ScrollView
@@ -250,7 +263,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <Card style={styles.settingsCard}>
             <TouchableOpacity
               style={styles.settingRow}
-              onPress={onManageBlockedWorkers}
+              onPress={handleManageBlockedWorkers}
               activeOpacity={0.7}
             >
               <View style={styles.settingLeft}>
@@ -266,7 +279,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
             <TouchableOpacity
               style={styles.settingRow}
-              onPress={onClearCache}
+              onPress={handleClearCache}
               activeOpacity={0.7}
             >
               <View style={styles.settingLeft}>

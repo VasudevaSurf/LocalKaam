@@ -1,5 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, FlatList, Dimensions, ViewToken } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './WelcomeScreen.styles';
 import { Button } from '../../../components/ui/Button';
 
@@ -36,13 +39,13 @@ const slides: OnboardingSlide[] = [
   },
 ];
 
-export interface WelcomeScreenProps {
-  onGetStarted: () => void;
-}
+type WelcomeScreenNavigationProp = NativeStackNavigationProp<
+  AuthStackParamList,
+  'Welcome'
+>;
 
-export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
-  onGetStarted,
-}) => {
+export const WelcomeScreen: React.FC = () => {
+  const navigation = useNavigation<WelcomeScreenNavigationProp>();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
@@ -65,12 +68,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         animated: true,
       });
     } else {
-      onGetStarted();
+      navigation.navigate('PhoneNumber');
     }
   };
 
   const handleSkip = () => {
-    onGetStarted();
+    navigation.navigate('PhoneNumber');
   };
 
   const renderSlide = ({ item }: { item: OnboardingSlide }) => (
@@ -131,3 +134,4 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     </View>
   );
 };
+

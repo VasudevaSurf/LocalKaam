@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 import { styles } from './ActiveBookingScreen.styles';
 import { Header } from '../../../components/common/Header';
 import { Card } from '../../../components/ui/Card';
@@ -14,50 +17,61 @@ import { Avatar } from '../../../components/ui/Avatar';
 import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
 import { Divider } from '../../../components/common/Divider';
+import { colors } from '../../../theme';
+import { Linking } from 'react-native';
 
-type BookingStatus =
-  | 'confirmed'
-  | 'worker_on_way'
-  | 'in_progress'
-  | 'payment_pending';
+type ActiveBookingScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'ActiveBooking'
+>;
 
-export interface ActiveBookingScreenProps {
-  bookingId: string;
-  workerName: string;
-  workerImage?: string;
-  workerPhone: string;
-  service: string;
-  location: string;
-  scheduledDate: string;
-  scheduledTime: string;
-  amount: number;
-  otp: string;
-  status: BookingStatus;
-  onCall: () => void;
-  onChat: () => void;
-  onCancelBooking: () => void;
-  onCompletePayment: () => void;
-  onBack: () => void;
-}
+type ActiveBookingScreenRouteProp = RouteProp<
+  RootStackParamList,
+  'ActiveBooking'
+>;
 
-export const ActiveBookingScreen: React.FC<ActiveBookingScreenProps> = ({
-  bookingId,
-  workerName,
-  workerImage,
-  workerPhone,
-  service,
-  location,
-  scheduledDate,
-  scheduledTime,
-  amount,
-  otp,
-  status,
-  onCall,
-  onChat,
-  onCancelBooking,
-  onCompletePayment,
-  onBack,
-}) => {
+export const ActiveBookingScreen: React.FC = () => {
+  const navigation = useNavigation<ActiveBookingScreenNavigationProp>();
+  const route = useRoute<ActiveBookingScreenRouteProp>();
+  const {
+    bookingId,
+    workerName,
+    workerPhone,
+    service,
+    location,
+    scheduledDate,
+    scheduledTime,
+    amount,
+    otp,
+    status,
+  } = route.params;
+
+  const workerImage = undefined; // Or pass from params
+
+  const handleCall = () => {
+    Linking.openURL(`tel:${workerPhone}`);
+  };
+
+  const handleChat = () => {
+    console.log('Navigate to chat');
+    // navigation.navigate('Chat', { userId: workerId });
+  };
+
+  // const handleCancelBooking = () => {
+  //   // API call
+  //   console.log('Cancelling booking', bookingId);
+  //   navigation.goBack();
+  // };
+
+  const handleCompletePayment = () => {
+    navigation.navigate('PaymentSuccess', {
+      amount: amount.toString(),
+      transactionId: 'tx_' + Date.now(),
+      date: new Date().toLocaleDateString(),
+      recipientName: workerName,
+      recipientId: 'worker_123', // Mock
+    });
+  };
   const [timer, setTimer] = useState(0);
 
   useEffect(() => {
@@ -138,7 +152,7 @@ export const ActiveBookingScreen: React.FC<ActiveBookingScreenProps> = ({
       <Header
         title="Active Booking"
         leftIcon={<Text style={styles.backIcon}>←</Text>}
-        onLeftPress={onBack}
+        onLeftPress={() => navigation.goBack()}
       />
 
       <ScrollView
@@ -214,14 +228,14 @@ export const ActiveBookingScreen: React.FC<ActiveBookingScreenProps> = ({
               title="📞 Call"
               variant="outline"
               size="medium"
-              onPress={onCall}
+              onPress={handleCall}
               style={styles.contactButton}
             />
             <Button
               title="💬 Chat"
               variant="outline"
               size="medium"
-              onPress={onChat}
+              onPress={handleChat}
               style={styles.contactButton}
             />
           </View>
@@ -309,7 +323,7 @@ export const ActiveBookingScreen: React.FC<ActiveBookingScreenProps> = ({
               title="I Have Paid in Cash"
               variant="primary"
               size="large"
-              onPress={onCompletePayment}
+              onPress={handleCompletePayment}
               fullWidth
             />
           </View>
@@ -321,7 +335,20 @@ export const ActiveBookingScreen: React.FC<ActiveBookingScreenProps> = ({
             title="Cancel Booking"
             variant="ghost"
             size="medium"
-            onPress={handleCancelBooking}
+            onPress={() => {
+              Alert.alert(
+                'Cancel Booking',
+                'Are you sure you want to cancel this booking?',
+                [
+                  { text: 'No', style: 'cancel' },
+                  {
+                    text: 'Yes, Cancel',
+                    style: 'destructive',
+                    onPress: handleCancelBooking,
+                  },
+                ],
+              );
+            }}
             style={styles.cancelButton}
           />
         )}

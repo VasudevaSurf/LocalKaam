@@ -7,31 +7,53 @@ import { Avatar } from '../../../components/ui/Avatar';
 import { Divider } from '../../../components/common/Divider';
 import { spacing } from '../../../theme';
 
-export interface PaymentSuccessScreenProps {
-  bookingId: string;
-  workerName: string;
-  workerImage?: string;
-  service: string;
-  amount: number;
-  date: string;
-  onDownloadReceipt: () => void;
-  onLeaveReview: () => void;
-  onBackToHome: () => void;
-  onViewBooking: () => void;
-}
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 
-export const PaymentSuccessScreen: React.FC<PaymentSuccessScreenProps> = ({
-  bookingId,
-  workerName,
-  workerImage,
-  service,
-  amount,
-  date,
-  onDownloadReceipt,
-  onLeaveReview,
-  onBackToHome,
-  onViewBooking,
-}) => {
+import { Alert } from 'react-native';
+
+type PaymentSuccessScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'PaymentSuccess'
+>;
+
+type PaymentSuccessScreenRouteProp = RouteProp<
+  RootStackParamList,
+  'PaymentSuccess'
+>;
+
+export const PaymentSuccessScreen: React.FC = () => {
+  const navigation = useNavigation<PaymentSuccessScreenNavigationProp>();
+  const route = useRoute<PaymentSuccessScreenRouteProp>();
+  const { amount, transactionId, date, recipientName, recipientId } =
+    route.params;
+
+  // Mock data derived from params or defaults
+  const bookingId = transactionId.replace('tx_', '');
+  const workerName = recipientName;
+  const workerImage = undefined;
+  const service = 'Service'; // This should ideally come from params too
+
+  const handleDownloadReceipt = () => {
+    Alert.alert('Success', 'Receipt downloaded successfully');
+  };
+
+  const handleLeaveReview = () => {
+    // navigation.navigate('LeaveReview', { workerId: recipientId });
+    Alert.alert('Coming Soon', 'Review feature coming soon');
+  };
+
+  const handleBackToHome = () => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'MainTab' }],
+    });
+  };
+
+  const handleViewBooking = () => {
+    navigation.navigate('PaymentHistory');
+  };
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -88,7 +110,7 @@ export const PaymentSuccessScreen: React.FC<PaymentSuccessScreenProps> = ({
 
             <View style={styles.detailRow}>
               <Text style={styles.amountLabel}>Amount Paid</Text>
-              <Text style={styles.amountValue}>₹{amount.toLocaleString()}</Text>
+              <Text style={styles.amountValue}>₹{amount}</Text>
             </View>
           </View>
         </Card>
@@ -124,7 +146,7 @@ export const PaymentSuccessScreen: React.FC<PaymentSuccessScreenProps> = ({
             title="📥 Download Receipt"
             variant="outline"
             size="large"
-            onPress={onDownloadReceipt}
+            onPress={handleDownloadReceipt}
             fullWidth
           />
 
@@ -132,7 +154,7 @@ export const PaymentSuccessScreen: React.FC<PaymentSuccessScreenProps> = ({
             title="⭐ Leave a Review"
             variant="secondary"
             size="large"
-            onPress={onLeaveReview}
+            onPress={handleLeaveReview}
             fullWidth
           />
 
@@ -140,7 +162,7 @@ export const PaymentSuccessScreen: React.FC<PaymentSuccessScreenProps> = ({
             title="View Booking Details"
             variant="ghost"
             size="medium"
-            onPress={onViewBooking}
+            onPress={handleViewBooking}
             fullWidth
           />
         </View>
@@ -164,7 +186,7 @@ export const PaymentSuccessScreen: React.FC<PaymentSuccessScreenProps> = ({
           title="Back to Home"
           variant="primary"
           size="large"
-          onPress={onBackToHome}
+          onPress={handleBackToHome}
           fullWidth
         />
       </View>

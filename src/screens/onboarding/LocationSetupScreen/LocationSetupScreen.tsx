@@ -1,17 +1,31 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, SafeAreaView, Alert } from 'react-native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 import { styles } from './LocationSetupScreen.styles';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Header } from '../../../components/common/Header';
+import { useAuth } from '../../../context/AuthContext';
 
-export interface LocationSetupScreenProps {
-  onComplete: (location: { city: string; area: string }) => void;
-}
+type LocationSetupScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'LocationSetup'
+>;
 
-export const LocationSetupScreen: React.FC<LocationSetupScreenProps> = ({
-  onComplete,
-}) => {
+// Define a specific route prop since we are passing params
+type LocationSetupScreenRouteProp = RouteProp<
+  { LocationSetup: { name: string; bio: string; profileImage?: string } },
+  'LocationSetup'
+>;
+
+export const LocationSetupScreen: React.FC = () => {
+  const navigation = useNavigation<LocationSetupScreenNavigationProp>();
+  const route = useRoute<LocationSetupScreenRouteProp>();
+  const { name, bio, profileImage } = route.params || {};
+  const { updateUser, uploadUserImage, user } = useAuth();
+
   const [city, setCity] = useState('');
   const [area, setArea] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,7 +40,7 @@ export const LocationSetupScreen: React.FC<LocationSetupScreenProps> = ({
     }, 1500);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!city.trim()) {
       Alert.alert('Error', 'Please enter your city');
       return;
@@ -35,7 +49,49 @@ export const LocationSetupScreen: React.FC<LocationSetupScreenProps> = ({
       Alert.alert('Error', 'Please enter your area');
       return;
     }
-    onComplete({ city, area });
+
+    setLoading(true);
+    try {
+      // 1. Upload Profile Image if exists
+      let profileImageUrl = profileImage;
+      if (profileImage && !profileImage.startsWith('http')) {
+        // It's a local URI, upload it
+        const uploadResult = await uploadUserImage(profileImage);
+        if (uploadResult) {
+          profileImageUrl = uploadResult;
+        } else {
+          // Upload failed, maybe show a warning but proceed
+          console.log('Image upload failed, proceeding with profile update');
+        }
+      }
+
+      // 2. Update User Profile with all data
+      const profileData = {
+        name,
+        bio,
+        city: { name: city, state: 'Punjab' }, // Hardcoded state for now or derive
+        profileImage: profileImageUrl,
+        userType: 'customer',
+      };
+
+      const success = await updateUser(profileData);
+
+      if (success) {
+        console.log('Profile setup complete, navigating to Main');
+        // Explicitly navigate to Main stack to ensure user doesn't get stuck
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Main' as any }],
+        });
+      } else {
+        Alert.alert('Error', 'Failed to save profile. Please try again.');
+      }
+    } catch (error) {
+      console.error('Profile Save Error:', error);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -69,7 +125,7 @@ export const LocationSetupScreen: React.FC<LocationSetupScreenProps> = ({
           variant="outline"
           size="large"
           onPress={handleDetectLocation}
-          loading={loading}
+          loading={loading && !city} // Only show loading on button if detecting
           fullWidth
           style={styles.detectButton}
         />
@@ -113,11 +169,12 @@ export const LocationSetupScreen: React.FC<LocationSetupScreenProps> = ({
       {/* Fixed Bottom Button */}
       <View style={styles.footer}>
         <Button
-          title="Continue"
+          title="Complete Setup"
           variant="primary"
           size="large"
           onPress={handleContinue}
           fullWidth
+          loading={loading && !!city} // Show loading when saving
           disabled={!city.trim() || !area.trim()}
         />
       </View>

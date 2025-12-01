@@ -7,11 +7,16 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 import { styles } from './NotificationsScreen.styles';
 import { Header } from '../../../components/common/Header';
 import { Card } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
 import { EmptyState } from '../../../components/common/EmptyState';
+import { colors } from '../../../theme';
+import { Alert } from 'react-native';
 
 type NotificationType = 'booking' | 'payment' | 'review' | 'general';
 
@@ -66,19 +71,28 @@ const MOCK_NOTIFICATIONS: Notification[] = [
   },
 ];
 
-export interface NotificationsScreenProps {
-  onNotificationPress: (notificationId: string) => void;
-  onMarkAllRead: () => void;
-  onBack: () => void;
-}
+type NotificationsScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'Notifications'
+>;
 
-export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
-  onNotificationPress,
-  onMarkAllRead,
-  onBack,
-}) => {
+export const NotificationsScreen: React.FC = () => {
+  const navigation = useNavigation<NotificationsScreenNavigationProp>();
   const [refreshing, setRefreshing] = useState(false);
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+
+  const handleNotificationPress = (notificationId: string) => {
+    // Mark as read logic
+    setNotifications(prev =>
+      prev.map(n => (n.id === notificationId ? { ...n, read: true } : n)),
+    );
+    // Navigate based on type (mock logic)
+    Alert.alert('Info', 'Notification details');
+  };
+
+  const handleMarkAllRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -127,12 +141,12 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
         leftIcon={<Text style={styles.backIcon}>←</Text>}
         rightIcon={
           unreadCount > 0 ? (
-            <TouchableOpacity onPress={onMarkAllRead}>
+            <TouchableOpacity onPress={handleMarkAllRead}>
               <Text style={styles.markReadText}>Mark all read</Text>
             </TouchableOpacity>
           ) : undefined
         }
-        onLeftPress={onBack}
+        onLeftPress={() => navigation.goBack()}
       />
 
       <ScrollView
@@ -151,7 +165,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                 styles.notificationCard,
                 !notification.read && styles.unreadCard,
               ]}
-              onPress={() => onNotificationPress(notification.id)}
+              onPress={() => handleNotificationPress(notification.id)}
             >
               <View style={styles.notificationHeader}>
                 <View

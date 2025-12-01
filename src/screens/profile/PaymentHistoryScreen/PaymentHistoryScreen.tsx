@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 import { styles } from './PaymentHistoryScreen.styles';
 import { Header } from '../../../components/common/Header';
 import { Card } from '../../../components/ui/Card';
@@ -14,6 +17,7 @@ import { Avatar } from '../../../components/ui/Avatar';
 import { Badge } from '../../../components/ui/Badge';
 import { Chip } from '../../../components/ui/Chip';
 import { EmptyState } from '../../../components/common/EmptyState';
+import { Alert } from 'react-native';
 
 type FilterType = 'all' | 'this_month' | 'last_month' | 'older';
 
@@ -76,19 +80,24 @@ const MOCK_PAYMENTS: Payment[] = [
   },
 ];
 
-export interface PaymentHistoryScreenProps {
-  onPaymentPress: (paymentId: string) => void;
-  onDownloadReceipt: (paymentId: string) => void;
-  onBack: () => void;
-}
+type PaymentHistoryScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'PaymentHistory'
+>;
 
-export const PaymentHistoryScreen: React.FC<PaymentHistoryScreenProps> = ({
-  onPaymentPress,
-  onDownloadReceipt,
-  onBack,
-}) => {
+export const PaymentHistoryScreen: React.FC = () => {
+  const navigation = useNavigation<PaymentHistoryScreenNavigationProp>();
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
   const [refreshing, setRefreshing] = useState(false);
+
+  const handlePaymentPress = (paymentId: string) => {
+    // navigation.navigate('PaymentDetail', { paymentId });
+    Alert.alert('Info', 'Payment details coming soon');
+  };
+
+  const handleDownloadReceipt = (paymentId: string) => {
+    Alert.alert('Success', 'Receipt downloaded');
+  };
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -114,7 +123,7 @@ export const PaymentHistoryScreen: React.FC<PaymentHistoryScreenProps> = ({
       <Header
         title="Payment History"
         leftIcon={<Text style={styles.backIcon}>←</Text>}
-        onLeftPress={onBack}
+        onLeftPress={() => navigation.goBack()}
       />
 
       <ScrollView
@@ -196,7 +205,7 @@ export const PaymentHistoryScreen: React.FC<PaymentHistoryScreenProps> = ({
               <Card
                 key={payment.id}
                 style={styles.paymentCard}
-                onPress={() => onPaymentPress(payment.id)}
+                onPress={() => handlePaymentPress(payment.id)}
               >
                 <View style={styles.paymentHeader}>
                   <Avatar
@@ -242,7 +251,7 @@ export const PaymentHistoryScreen: React.FC<PaymentHistoryScreenProps> = ({
 
                   <TouchableOpacity
                     style={styles.downloadButton}
-                    onPress={() => onDownloadReceipt(payment.id)}
+                    onPress={() => handleDownloadReceipt(payment.id)}
                   >
                     <Text style={styles.downloadIcon}>📥</Text>
                     <Text style={styles.downloadText}>Receipt</Text>

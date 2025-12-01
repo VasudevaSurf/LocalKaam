@@ -3,17 +3,19 @@ import { View, Text } from 'react-native';
 import { styles } from './SplashScreen.styles';
 
 export interface SplashScreenProps {
-  onComplete: () => void;
+  onComplete?: () => void;
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
   useEffect(() => {
-    // Simulate loading time
-    const timer = setTimeout(() => {
-      onComplete();
-    }, 2000);
+    if (onComplete) {
+      // Simulate loading time only if onComplete is provided
+      const timer = setTimeout(() => {
+        onComplete();
+      }, 2000);
 
-    return () => clearTimeout(timer);
+      return () => clearTimeout(timer);
+    }
   }, [onComplete]);
 
   return (

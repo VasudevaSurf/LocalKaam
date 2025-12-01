@@ -8,27 +8,34 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AuthStackParamList } from '../../../navigation/types';
 import { styles } from './OTPVerificationScreen.styles';
 import { Button } from '../../../components/ui/Button';
+import { useAuth } from '../../../context/AuthContext';
 
-export interface OTPVerificationScreenProps {
-  phoneNumber: string;
-  onVerifyOTP: (otp: string) => void;
-  onResendOTP: () => void;
-  onBack: () => void;
-}
+type OTPVerificationScreenNavigationProp = NativeStackNavigationProp<
+  AuthStackParamList,
+  'OTPVerification'
+>;
 
-export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
-  phoneNumber,
-  onVerifyOTP,
-  onResendOTP,
-  onBack,
-}) => {
+type OTPVerificationScreenRouteProp = RouteProp<
+  AuthStackParamList,
+  'OTPVerification'
+>;
+
+export const OTPVerificationScreen: React.FC = () => {
+  const navigation = useNavigation<OTPVerificationScreenNavigationProp>();
+  const route = useRoute<OTPVerificationScreenRouteProp>();
+  const { phoneNumber, confirmation } = route.params;
+
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
   const [loading, setLoading] = useState(false);
   const inputRefs = useRef<Array<TextInput | null>>([]);
+  const { login } = useAuth();
 
   useEffect(() => {
     // Auto-focus first input
@@ -79,7 +86,7 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
     }
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     const otpString = otp.join('');
     if (otpString.length !== 6) {
       Alert.alert('Incomplete OTP', 'Please enter complete 6-digit OTP');
@@ -87,11 +94,34 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
     }
 
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // 1. Verify with Firebase
+      if (confirmation) {
+        await confirmation.confirm(otpString);
+      } else {
+        console.warn(
+          'No confirmation object found, skipping Firebase auth (dev mode?)',
+        );
+      }
+
+      // 2. Sync with Backend via AuthContext
+      const success = await login(phoneNumber, otpString);
+
       setLoading(false);
-      onVerifyOTP(otpString);
-    }, 1000);
+      if (success) {
+        console.log('Login successful, waiting for navigation state update...');
+      } else {
+        Alert.alert('Login Failed', 'Could not verify user with server.');
+      }
+    } catch (error: any) {
+      setLoading(false);
+      console.error('OTP Verification Error:', error);
+      if (error.code === 'auth/invalid-verification-code') {
+        Alert.alert('Invalid OTP', 'The code you entered is incorrect.');
+      } else {
+        Alert.alert('Error', 'Failed to verify OTP. Please try again.');
+      }
+    }
   };
 
   const handleResend = () => {
@@ -100,7 +130,7 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
       setCanResend(false);
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
-      onResendOTP();
+      console.log('Resending OTP...');
     }
   };
 
@@ -118,7 +148,10 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
         keyboardShouldPersistTaps="handled"
       >
         {/* Back Button */}
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
 
@@ -142,7 +175,9 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
             {otp.map((digit, index) => (
               <TextInput
                 key={index}
-                ref={ref => (inputRefs.current[index] = ref)}
+                ref={ref => {
+                  inputRefs.current[index] = ref;
+                }}
                 style={[styles.otpInput, digit && styles.otpInputFilled]}
                 value={digit}
                 onChangeText={value => handleOTPChange(value, index)}

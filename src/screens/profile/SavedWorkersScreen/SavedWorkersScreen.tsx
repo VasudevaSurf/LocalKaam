@@ -6,6 +6,9 @@ import {
   SafeAreaView,
   RefreshControl,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 import { styles } from './SavedWorkersScreen.styles';
 import { Header } from '../../../components/common/Header';
 import { ServiceCard } from '../../../components/common/ServiceCard';
@@ -40,15 +43,13 @@ const MOCK_SAVED_WORKERS = [
   },
 ];
 
-export interface SavedWorkersScreenProps {
-  onWorkerPress: (workerId: string) => void;
-  onBack: () => void;
-}
+type SavedWorkersScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'SavedWorkers'
+>;
 
-export const SavedWorkersScreen: React.FC<SavedWorkersScreenProps> = ({
-  onWorkerPress,
-  onBack,
-}) => {
+export const SavedWorkersScreen: React.FC = () => {
+  const navigation = useNavigation<SavedWorkersScreenNavigationProp>();
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = () => {
@@ -64,7 +65,7 @@ export const SavedWorkersScreen: React.FC<SavedWorkersScreenProps> = ({
         title="Saved Workers"
         subtitle={`${MOCK_SAVED_WORKERS.length} workers`}
         leftIcon={<Text style={styles.backIcon}>←</Text>}
-        onLeftPress={onBack}
+        onLeftPress={() => navigation.goBack()}
       />
 
       <FlatList
@@ -73,7 +74,9 @@ export const SavedWorkersScreen: React.FC<SavedWorkersScreenProps> = ({
         renderItem={({ item }) => (
           <ServiceCard
             {...item}
-            onPress={() => onWorkerPress(item.id)}
+            onPress={() =>
+              navigation.navigate('WorkerProfile', { workerId: item.id })
+            }
             style={styles.workerCard}
           />
         )}

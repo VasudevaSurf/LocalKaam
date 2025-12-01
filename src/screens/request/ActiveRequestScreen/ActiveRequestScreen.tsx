@@ -6,6 +6,9 @@ import {
   SafeAreaView,
   RefreshControl,
 } from 'react-native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 import { styles } from './ActiveRequestScreen.styles';
 import { Header } from '../../../components/common/Header';
 import { QuoteCard } from '../../../components/common/QuoteCard';
@@ -84,26 +87,51 @@ const MOCK_QUOTES = [
   },
 ];
 
-export interface ActiveRequestScreenProps {
-  requestId: string;
-  onAcceptQuote: (quoteId: string) => void;
-  onViewProfile: (sellerId: string) => void;
-  onChat: (sellerId: string) => void;
-  onCancelRequest: () => void;
-  onBack: () => void;
-}
+type ActiveRequestScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'ActiveRequest'
+>;
 
-export const ActiveRequestScreen: React.FC<ActiveRequestScreenProps> = ({
-  requestId,
-  onAcceptQuote,
-  onViewProfile,
-  onChat,
-  onCancelRequest,
-  onBack,
-}) => {
+type ActiveRequestScreenRouteProp = RouteProp<
+  RootStackParamList,
+  'ActiveRequest'
+>;
+
+export const ActiveRequestScreen: React.FC = () => {
+  const navigation = useNavigation<ActiveRequestScreenNavigationProp>();
+  const route = useRoute<ActiveRequestScreenRouteProp>();
+  const { requestId } = route.params;
+
   const [quotes, setQuotes] = useState(MOCK_QUOTES);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const handleAcceptQuote = (quoteId: string) => {
+    const quote = quotes.find(q => q.id === quoteId);
+    if (quote) {
+      navigation.navigate('BookingConfirmation', {
+        workerId: quote.sellerId,
+        workerName: quote.seller.name,
+        service: quote.seller.services[0],
+        basePrice: quote.quotedPrice,
+      });
+    }
+  };
+
+  const handleViewProfile = (sellerId: string) => {
+    navigation.navigate('WorkerProfile', { workerId: sellerId });
+  };
+
+  const handleChat = (sellerId: string) => {
+    console.log('Navigate to chat with', sellerId);
+    // navigation.navigate('Chat', { userId: sellerId });
+  };
+
+  const handleCancelRequest = () => {
+    // Call API to cancel
+    console.log('Cancelling request', requestId);
+    navigation.goBack();
+  };
 
   // Simulate real-time quote updates
   useEffect(() => {
@@ -131,7 +159,7 @@ export const ActiveRequestScreen: React.FC<ActiveRequestScreenProps> = ({
       <Header
         title="Your Request"
         leftIcon={<Text style={styles.backIcon}>←</Text>}
-        onLeftPress={onBack}
+        onLeftPress={() => navigation.goBack()}
       />
 
       <ScrollView
@@ -221,9 +249,9 @@ export const ActiveRequestScreen: React.FC<ActiveRequestScreenProps> = ({
                 reviewCount={quote.seller.reviewCount}
                 distance={quote.seller.distance}
                 verified={quote.seller.verified}
-                onAccept={() => onAcceptQuote(quote.id)}
-                onViewProfile={() => onViewProfile(quote.sellerId)}
-                onChat={() => onChat(quote.sellerId)}
+                onAccept={() => handleAcceptQuote(quote.id)}
+                onViewProfile={() => handleViewProfile(quote.sellerId)}
+                onChat={() => handleChat(quote.sellerId)}
                 style={styles.quoteCard}
               />
             ))
@@ -241,7 +269,7 @@ export const ActiveRequestScreen: React.FC<ActiveRequestScreenProps> = ({
           title="Cancel Request"
           variant="ghost"
           size="medium"
-          onPress={onCancelRequest}
+          onPress={handleCancelRequest}
           style={styles.cancelButton}
         />
       </ScrollView>
