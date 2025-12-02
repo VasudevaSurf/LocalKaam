@@ -38,7 +38,7 @@ export const AppNavigator = () => {
   // Check for active request when user is authenticated
   useEffect(() => {
     const checkForActiveRequest = async () => {
-      if (user?.id && isAuthenticated) {
+      if (user?.id && user.id !== 'temp_id' && isAuthenticated) {
         try {
           console.log('[AppNavigator] Checking for active request...');
           const request = await api.getActiveRequest(user.id);
