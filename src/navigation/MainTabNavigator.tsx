@@ -3,11 +3,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from './types';
 import { BottomTabBar } from '../components/navigation/BottomTabBar';
 
-// Screens
-import { PostServiceScreen } from '../screens/home/PostServiceScreen';
-import { BrowseServicesScreen } from '../screens/browse/BrowseServicesScreen';
-import { MyBookingsScreen } from '../screens/bookings/MyBookingsScreen';
-import { ProfileScreen } from '../screens/profile/ProfileScreen';
+// Container Screens (with navigation logic)
+import { PostServiceScreenContainer } from '../screens/home/PostServiceScreen/PostServiceScreenContainer';
+import { BrowseServicesScreenContainer } from '../screens/browse/BrowseServicesScreen/BrowseServicesScreenContainer';
+import { MyBookingsScreenContainer } from '../screens/bookings/MyBookingsScreen/MyBookingsScreenContainer';
+import { ProfileScreenContainer } from '../screens/profile/ProfileScreen/ProfileScreenContainer';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -19,10 +19,10 @@ export const MainTabNavigator = () => {
       }}
       tabBar={props => <BottomTabBar {...props} />}
     >
-      <Tab.Screen name="Home" component={PostServiceScreen} />
-      <Tab.Screen name="Browse" component={BrowseServicesScreen} />
-      <Tab.Screen name="Bookings" component={MyBookingsScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Home" component={PostServiceScreenContainer} />
+      <Tab.Screen name="Browse" component={BrowseServicesScreenContainer} />
+      <Tab.Screen name="Bookings" component={MyBookingsScreenContainer} />
+      <Tab.Screen name="Profile" component={ProfileScreenContainer} />
     </Tab.Navigator>
   );
 };

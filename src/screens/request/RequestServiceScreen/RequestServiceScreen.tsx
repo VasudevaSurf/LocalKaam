@@ -16,6 +16,8 @@ import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
 import { Chip } from '../../../components/ui/Chip';
 import { Card } from '../../../components/ui/Card';
+import { useAuth } from '../../../context/AuthContext';
+import * as api from '../../../services/api';
 
 const SERVICE_TYPES = [
   { id: '1', label: 'Electrician', icon: '⚡' },
@@ -42,13 +44,15 @@ type RequestServiceScreenNavigationProp = NativeStackNavigationProp<
 
 export const RequestServiceScreen: React.FC = () => {
   const navigation = useNavigation<RequestServiceScreenNavigationProp>();
+  const { user } = useAuth();
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('Model Town, Ludhiana');
   const [budget, setBudget] = useState('');
   const [selectedUrgency, setSelectedUrgency] = useState<string>('asap');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedService) {
       Alert.alert('Error', 'Please select a service type');
       return;
@@ -62,22 +66,52 @@ export const RequestServiceScreen: React.FC = () => {
       return;
     }
 
-    const request = {
-      serviceType: selectedService,
-      description: description.trim(),
-      location,
-      budget,
-      urgency: selectedUrgency,
-      timestamp: new Date(),
-    };
+    const serviceName =
+      SERVICE_TYPES.find(s => s.id === selectedService)?.label || '';
 
-    // TODO: Call API to create request
-    console.log('Submitting request:', request);
+    try {
+      setIsSubmitting(true);
 
-    // Simulate API call success and navigate
-    // In real app, get requestId from response
-    const mockRequestId = 'req_' + Date.now();
-    navigation.navigate('ActiveRequest', { requestId: mockRequestId });
+      const requestData = {
+        serviceType: serviceName,
+        description: description.trim(),
+        location,
+        budget: parseFloat(budget),
+        urgency: selectedUrgency,
+        customerId: user?.id,
+        customerPhone: user?.phoneNumber,
+        customerName: user?.name,
+      };
+
+      console.log('[RequestService] Submitting request:', requestData);
+
+      const createdRequest = await api.createServiceRequest(requestData);
+
+      console.log('[RequestService] Request created:', createdRequest);
+
+      Alert.alert(
+        'Success!',
+        'Your service request has been posted. Workers will send you quotes soon.',
+        [
+          {
+            text: 'OK',
+            onPress: () =>
+              navigation.navigate('ActiveRequest', {
+                requestId: createdRequest._id,
+              }),
+          },
+        ],
+      );
+    } catch (error: any) {
+      console.error('[RequestService] Error creating request:', error);
+      Alert.alert(
+        'Error',
+        error.response?.data?.msg ||
+          'Failed to create service request. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const serviceName =
@@ -243,11 +277,14 @@ export const RequestServiceScreen: React.FC = () => {
       {/* Fixed Bottom Button */}
       <View style={styles.footer}>
         <Button
-          title="Post Request & Get Quotes"
+          title={
+            isSubmitting ? 'Posting Request...' : 'Post Request & Get Quotes'
+          }
           variant="primary"
           size="large"
           onPress={handleSubmit}
           fullWidth
+          disabled={isSubmitting}
         />
         <Text style={styles.footerNote}>
           Free to post • Get multiple quotes

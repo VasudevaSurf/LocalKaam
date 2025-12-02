@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getAuth, getIdToken } from '@react-native-firebase/auth';
 
 // Use the same IP as LocalKaamWorker
-const API_URL = 'http://192.168.29.157:5000/api';
+const API_URL = 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -101,6 +101,87 @@ export const getWorkerVideos = async (userId: string) => {
   } catch (error) {
     console.error('Error fetching worker videos:', error);
     return [];
+  }
+};
+
+// Service Request APIs
+export const createServiceRequest = async (requestData: {
+  serviceType: string;
+  description: string;
+  location: string;
+  budget: number;
+  urgency: string;
+  scheduledDate?: string;
+}) => {
+  try {
+    const response = await api.post('/service-requests', requestData);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating service request:', error);
+    throw error;
+  }
+};
+
+export const getMyServiceRequests = async (customerId: string) => {
+  try {
+    const response = await api.get(`/service-requests/customer/${customerId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching service requests:', error);
+    return [];
+  }
+};
+
+export const getServiceRequest = async (requestId: string) => {
+  try {
+    const response = await api.get(`/service-requests/${requestId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching service request:', error);
+    throw error;
+  }
+};
+
+export const updateServiceRequest = async (
+  requestId: string,
+  updates: { status?: string; quotesCount?: number },
+) => {
+  try {
+    const response = await api.patch(`/service-requests/${requestId}`, updates);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating service request:', error);
+    throw error;
+  }
+};
+
+export const cancelServiceRequest = async (requestId: string) => {
+  try {
+    const response = await api.delete(`/service-requests/${requestId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error cancelling service request:', error);
+    throw error;
+  }
+};
+
+export const getActiveRequest = async (customerId: string) => {
+  try {
+    const response = await api.get(`/service-requests/active/${customerId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching active request:', error);
+    return null; // Return null if no active request or error
+  }
+};
+
+export const acceptQuote = async (quoteId: string) => {
+  try {
+    const response = await api.post(`/quotes/${quoteId}/accept`);
+    return response.data;
+  } catch (error) {
+    console.error('Error accepting quote:', error);
+    throw error;
   }
 };
 

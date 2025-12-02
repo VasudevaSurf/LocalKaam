@@ -8,6 +8,7 @@ import React, {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as api from '../services/api';
 import auth, { getAuth } from '@react-native-firebase/auth';
+import storage from '@react-native-firebase/storage';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   loginStart,
@@ -26,6 +27,7 @@ import { cache } from '../utils/cache';
 
 interface User {
   id: string;
+  _id?: string; // MongoDB ID
   name: string;
   phoneNumber: string;
   email?: string;
@@ -82,24 +84,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!forceRefresh) {
           const cachedUser = await cache.get<User>(cacheKey);
           if (cachedUser) {
-            console.log('[AuthContext] Using cached user profile');
-            dispatch(setUser(cachedUser));
+            console.log('[AuthContext] Using cached customer profile');
+            // Map _id to id for cached user
+            const mappedUser = {
+              ...cachedUser,
+              id: cachedUser._id || cachedUser.id,
+            };
+            dispatch(setUser(mappedUser));
             return;
           }
         }
 
         // If forced, not in cache, or expired, fetch from API
         console.log(
-          `[AuthContext] Fetching user profile from API (Force: ${forceRefresh})`,
+          `[AuthContext] Fetching customer profile from API (Force: ${forceRefresh})`,
         );
         const updatedUser = await api.getProfile(user.phoneNumber);
         if (updatedUser) {
-          await cache.set(cacheKey, updatedUser);
-          dispatch(setUser(updatedUser));
+          // Map MongoDB _id to id
+          const mappedUser = {
+            ...updatedUser,
+            id: updatedUser._id || updatedUser.id,
+          };
+          await cache.set(cacheKey, mappedUser);
+          dispatch(setUser(mappedUser));
         }
       }
     } catch (error) {
-      console.error('Error refreshing profile:', error);
+      console.error('[AuthContext] Error refreshing profile:', error);
     }
   };
 
@@ -127,7 +139,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const cachedUser = await cache.get<User>(cacheKey);
         if (cachedUser) {
           console.log('[AuthContext] Login: User found in cache');
-          dispatch(setUser(cachedUser));
+          const mappedUser = {
+            ...cachedUser,
+            id: cachedUser._id || cachedUser.id,
+          };
+          dispatch(setUser(mappedUser));
           dispatch(loginSuccess('mock_token_123')); // In real app, get token from backend
           return true;
         }
@@ -135,8 +151,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const existingUser = await api.getProfile(formattedPhone);
         if (existingUser) {
           console.log('User found:', existingUser);
-          await cache.set(cacheKey, existingUser);
-          dispatch(setUser(existingUser));
+          const mappedUser = {
+            ...existingUser,
+            id: existingUser._id || existingUser.id,
+          };
+          await cache.set(cacheKey, mappedUser);
+          dispatch(setUser(mappedUser));
           dispatch(loginSuccess('mock_token_123'));
           return true;
         }

@@ -5,6 +5,7 @@ import {
   BottomTabBar,
   TabRoute,
 } from '../../components/navigation/BottomTabBar';
+import { useAuth } from '../../context/AuthContext';
 
 // Tab Screens
 import { PostServiceScreen } from '../../screens/home/PostServiceScreen';
@@ -67,6 +68,14 @@ export const MainApp: React.FC<MainAppProps> = ({
   onLogout,
 }) => {
   const [activeTab, setActiveTab] = useState<TabRoute>('home');
+  const { user } = useAuth();
+
+  // Format member since date
+  const getMemberSince = () => {
+    if (!user) return 'Recently';
+    // You can add createdAt field to User interface and use it here
+    return 'Nov 2024'; // Placeholder for now
+  };
 
   const renderScreen = () => {
     switch (activeTab) {
@@ -102,11 +111,12 @@ export const MainApp: React.FC<MainAppProps> = ({
       case 'profile':
         return (
           <ProfileScreen
-            userName="Amit Singh"
-            userPhone="+91 98765 43210"
-            userEmail="amit.singh@example.com"
-            memberSince="Nov 2024"
-            totalBookings={23}
+            userName={user?.name || 'Guest User'}
+            userPhone={user?.phoneNumber || ''}
+            userEmail={user?.email}
+            userImage={user?.profileImage}
+            memberSince={getMemberSince()}
+            totalBookings={0} // TODO: Fetch from bookings API
             onEditProfile={onEditProfile}
             onSavedWorkers={onSavedWorkers}
             onPaymentHistory={onPaymentHistory}

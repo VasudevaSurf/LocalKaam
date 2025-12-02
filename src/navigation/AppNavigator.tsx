@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './types';
 import { useAuth } from '../context/AuthContext';
+import * as api from '../services/api';
 
 // Stacks
 import { AuthStack } from './AuthStack';
@@ -31,8 +32,39 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const AppNavigator = () => {
   const { isAuthenticated, isInitialized, user } = useAuth();
+  const [checkingActiveRequest, setCheckingActiveRequest] = useState(true);
+  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
 
-  if (!isInitialized) {
+  // Check for active request when user is authenticated
+  useEffect(() => {
+    const checkForActiveRequest = async () => {
+      if (user?.id && isAuthenticated) {
+        try {
+          console.log('[AppNavigator] Checking for active request...');
+          const request = await api.getActiveRequest(user.id);
+          if (request && request._id) {
+            console.log('[AppNavigator] Active request found:', request._id);
+            setActiveRequestId(request._id);
+          } else {
+            console.log('[AppNavigator] No active request found');
+          }
+        } catch (error) {
+          console.error('[AppNavigator] Error checking active request:', error);
+        }
+      }
+      setCheckingActiveRequest(false);
+    };
+
+    if (isInitialized && !checkingActiveRequest) {
+      setCheckingActiveRequest(true);
+    }
+
+    if (isInitialized) {
+      checkForActiveRequest();
+    }
+  }, [user?.id, isAuthenticated, isInitialized]);
+
+  if (!isInitialized || (isAuthenticated && checkingActiveRequest)) {
     return <SplashScreen />;
   }
 
@@ -63,16 +95,31 @@ export const AppNavigator = () => {
           />
         ) : (
           <>
-            <Stack.Screen name="Main" component={MainTabNavigator} />
+            {activeRequestId ? (
+              // Show ActiveRequest as initial screen if there's an active request
+              <>
+                <Stack.Screen
+                  name="ActiveRequest"
+                  component={ActiveRequestScreen}
+                  initialParams={{ requestId: activeRequestId }}
+                />
+                <Stack.Screen name="Main" component={MainTabNavigator} />
+              </>
+            ) : (
+              // Show Main tabs as initial screen if no active request
+              <>
+                <Stack.Screen name="Main" component={MainTabNavigator} />
+                <Stack.Screen
+                  name="ActiveRequest"
+                  component={ActiveRequestScreen}
+                />
+              </>
+            )}
 
             {/* Feature Screens */}
             <Stack.Screen
               name="RequestService"
               component={RequestServiceScreen}
-            />
-            <Stack.Screen
-              name="ActiveRequest"
-              component={ActiveRequestScreen}
             />
             <Stack.Screen
               name="WorkerProfile"

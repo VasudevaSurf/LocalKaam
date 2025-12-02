@@ -12,6 +12,7 @@ import { Button } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
 import { LocationPicker } from '../../../components/common/LocationPicker';
 import { EmptyState } from '../../../components/common/EmptyState';
+import { useAuth } from '../../../context/AuthContext';
 
 interface ActiveRequest {
   id: string;
@@ -49,6 +50,7 @@ export const PostServiceScreen: React.FC<PostServiceScreenProps> = ({
   onNotificationPress,
 }) => {
   const [refreshing, setRefreshing] = useState(false);
+  const { user } = useAuth();
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -57,12 +59,18 @@ export const PostServiceScreen: React.FC<PostServiceScreenProps> = ({
     }, 1500);
   };
 
+  // Get first name from full name
+  const getFirstName = () => {
+    if (!user?.name) return 'there';
+    return user.name.split(' ')[0];
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hello 👋</Text>
+          <Text style={styles.greeting}>Hello, {getFirstName()} 👋</Text>
           <Text style={styles.title}>What service do you need?</Text>
         </View>
         <TouchableOpacity

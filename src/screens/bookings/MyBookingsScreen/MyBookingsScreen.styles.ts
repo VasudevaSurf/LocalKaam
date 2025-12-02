@@ -18,18 +18,16 @@ export const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: colors.white,
+    backgroundColor: colors.backgroundPrimary,
     paddingHorizontal: spacing.screenPadding,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: colors.border,
   },
   tab: {
     flex: 1,
-    flexDirection: 'row',
+    paddingVertical: spacing.md,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.lg,
-    gap: spacing.sm,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
@@ -38,32 +36,11 @@ export const styles = StyleSheet.create({
   },
   tabText: {
     ...typography.bodyMedium,
-    fontFamily: typography.buttonMedium.fontFamily,
     color: colors.textSecondary,
   },
   tabTextActive: {
+    ...typography.bodyMediumBold,
     color: colors.primary,
-  },
-  tabBadge: {
-    minWidth: getFigmaDimension(20),
-    height: getFigmaDimension(20),
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.gray[200],
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xs,
-  },
-  tabBadgeActive: {
-    backgroundColor: colors.primary,
-  },
-  tabBadgeText: {
-    ...typography.caption,
-    fontSize: getFigmaDimension(10),
-    fontFamily: typography.captionBold.fontFamily,
-    color: colors.textSecondary,
-  },
-  tabBadgeTextActive: {
-    color: colors.white,
   },
   scrollView: {
     flex: 1,
@@ -73,52 +50,56 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.massive,
   },
-  bookingCard: {
+  requestCard: {
     marginBottom: spacing.md,
-    gap: spacing.lg,
   },
-  cardHeader: {
+  requestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  requestHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  headerInfo: {
     flex: 1,
-    gap: spacing.xs,
   },
-  workerName: {
+  serviceIcon: {
+    fontSize: getFigmaDimension(32),
+  },
+  requestInfo: {
+    flex: 1,
+  },
+  serviceName: {
     ...typography.h4,
     color: colors.textPrimary,
   },
-  service: {
-    ...typography.bodySmall,
+  requestTime: {
+    ...typography.caption,
     color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
-  cardDetails: {
+  description: {
+    ...typography.bodyMedium,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+    lineHeight: getFigmaDimension(20),
+  },
+  requestMeta: {
     gap: spacing.sm,
   },
-  detailRow: {
+  metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  detailIcon: {
-    fontSize: getFigmaDimension(16),
+  metaIcon: {
+    fontSize: getFigmaDimension(14),
   },
-  detailText: {
-    ...typography.bodyMedium,
+  metaText: {
+    ...typography.bodySmall,
     color: colors.textSecondary,
-    flex: 1,
-  },
-  amountText: {
-    ...typography.h4,
-    color: colors.primary,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  actionButton: {
     flex: 1,
   },
 });

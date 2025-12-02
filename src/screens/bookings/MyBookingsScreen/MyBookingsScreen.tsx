@@ -1,254 +1,181 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   SafeAreaView,
-  TouchableOpacity,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 import { styles } from './MyBookingsScreen.styles';
 import { Header } from '../../../components/common/Header';
 import { Card } from '../../../components/ui/Card';
-import { Avatar } from '../../../components/ui/Avatar';
 import { Badge } from '../../../components/ui/Badge';
-import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/common/EmptyState';
+import { LoadingState } from '../../../components/common/LoadingState';
+import { useAuth } from '../../../context/AuthContext';
+import * as api from '../../../services/api';
 
-type BookingTab = 'active' | 'completed' | 'cancelled';
-
-interface Booking {
-  id: string;
-  workerName: string;
-  workerImage?: string;
-  service: string;
-  status:
-    | 'upcoming'
-    | 'in_progress'
-    | 'completed'
-    | 'cancelled'
-    | 'pending_payment';
-  date: string;
-  time: string;
-  location: string;
-  amount: string;
-  scheduledDate?: string;
+interface ServiceRequest {
+  _id: string;
+  serviceType: string;
+  description: string;
+  location: {
+    address: string;
+    city?: string;
+  };
+  budget: number;
+  urgency: string;
+  status: string;
+  quotesCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
-// Mock Data
-const MOCK_BOOKINGS: Booking[] = [
-  {
-    id: '1',
-    workerName: 'Rajesh Kumar',
-    workerImage: '',
-    service: 'Electrician',
-    status: 'in_progress',
-    date: 'Today',
-    time: '10:00 AM',
-    location: 'Model Town, Ludhiana',
-    amount: '₹2,400',
-    scheduledDate: 'Nov 22, 2025',
-  },
-  {
-    id: '2',
-    workerName: 'Amit Singh',
-    workerImage: '',
-    service: 'Plumber',
-    status: 'upcoming',
-    date: 'Tomorrow',
-    time: '2:00 PM',
-    location: 'Civil Lines, Ludhiana',
-    amount: '₹1,800',
-    scheduledDate: 'Nov 23, 2025',
-  },
-  {
-    id: '3',
-    workerName: 'Suresh Patel',
-    workerImage: '',
-    service: 'Painter',
-    status: 'completed',
-    date: '2 days ago',
-    time: '9:00 AM',
-    location: 'Sarabha Nagar, Ludhiana',
-    amount: '₹3,200',
-    scheduledDate: 'Nov 20, 2025',
-  },
-];
+type MyBookingsScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'Main'
+>;
 
-export interface MyBookingsScreenProps {
-  onBookingPress: (bookingId: string) => void;
-  onContactWorker: (workerId: string) => void;
-  onLeaveReview: (bookingId: string) => void;
-  onCancelBooking: (bookingId: string) => void;
-  onBack: () => void;
-}
-
-export const MyBookingsScreen: React.FC<MyBookingsScreenProps> = ({
-  onBookingPress,
-  onContactWorker,
-  onLeaveReview,
-  onCancelBooking,
-  onBack,
-}) => {
-  const [selectedTab, setSelectedTab] = useState<BookingTab>('active');
+export const MyBookingsScreen: React.FC = () => {
+  const navigation = useNavigation<MyBookingsScreenNavigationProp>();
+  const { user } = useAuth();
+  const [requests, setRequests] = useState<ServiceRequest[]>([]);
+  const [filteredRequests, setFilteredRequests] = useState<ServiceRequest[]>(
+    [],
+  );
+  const [selectedTab, setSelectedTab] = useState<
+    'all' | 'active' | 'completed' | 'cancelled'
+  >('all');
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const handleRefresh = () => {
+  const fetchRequests = async () => {
+    if (!user?.id) return;
+
+    try {
+      const data = await api.getMyServiceRequests(user.id);
+      setRequests(data || []);
+      filterRequests(data || [], selectedTab);
+    } catch (error) {
+      console.error('[MyBookings] Error fetching requests:', error);
+      setRequests([]);
+      setFilteredRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterRequests = (
+    allRequests: ServiceRequest[],
+    tab: typeof selectedTab,
+  ) => {
+    let filtered = allRequests;
+
+    if (tab === 'active') {
+      filtered = allRequests.filter(
+        r =>
+          r.status === 'pending' ||
+          r.status === 'quoted' ||
+          r.status === 'accepted',
+      );
+    } else if (tab === 'completed') {
+      filtered = allRequests.filter(r => r.status === 'completed');
+    } else if (tab === 'cancelled') {
+      filtered = allRequests.filter(r => r.status === 'cancelled');
+    }
+
+    setFilteredRequests(filtered);
+  };
+
+  useEffect(() => {
+    fetchRequests();
+  }, [user?.id]);
+
+  useEffect(() => {
+    filterRequests(requests, selectedTab);
+  }, [selectedTab, requests]);
+
+  const handleRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
+    await fetchRequests();
+    setRefreshing(false);
   };
 
-  const getStatusBadge = (status: Booking['status']) => {
-    switch (status) {
-      case 'upcoming':
-        return <Badge label="Upcoming" variant="info" size="small" />;
-      case 'in_progress':
-        return <Badge label="In Progress" variant="warning" size="small" />;
-      case 'completed':
-        return <Badge label="Completed" variant="success" size="small" />;
-      case 'cancelled':
-        return <Badge label="Cancelled" variant="error" size="small" />;
-      case 'pending_payment':
-        return <Badge label="Pending Payment" variant="warning" size="small" />;
-      default:
-        return null;
-    }
+  const handleRequestPress = (requestId: string) => {
+    navigation.navigate('ActiveRequest', { requestId });
   };
 
-  const getFilteredBookings = () => {
-    switch (selectedTab) {
-      case 'active':
-        return MOCK_BOOKINGS.filter(
-          b =>
-            b.status === 'upcoming' ||
-            b.status === 'in_progress' ||
-            b.status === 'pending_payment',
-        );
-      case 'completed':
-        return MOCK_BOOKINGS.filter(b => b.status === 'completed');
-      case 'cancelled':
-        return MOCK_BOOKINGS.filter(b => b.status === 'cancelled');
-      default:
-        return [];
-    }
+  const getServiceIcon = (serviceType: string) => {
+    const icons: Record<string, string> = {
+      Electrician: '⚡',
+      Plumber: '🔧',
+      Painter: '🎨',
+      Carpenter: '🔨',
+      Cook: '👨‍🍳',
+      Mechanic: '🚗',
+      Cleaner: '🧹',
+    };
+    return icons[serviceType] || '🔧';
   };
 
-  const filteredBookings = getFilteredBookings();
+  const getStatusVariant = (
+    status: string,
+  ): 'success' | 'warning' | 'error' | 'info' => {
+    const variants: Record<string, 'success' | 'warning' | 'error' | 'info'> = {
+      pending: 'warning',
+      quoted: 'info',
+      accepted: 'success',
+      completed: 'success',
+      cancelled: 'error',
+    };
+    return variants[status] || 'info';
+  };
 
-  const renderBookingCard = (booking: Booking) => (
-    <Card
-      key={booking.id}
-      style={styles.bookingCard}
-      onPress={() => onBookingPress(booking.id)}
-    >
-      {/* Header */}
-      <View style={styles.cardHeader}>
-        <Avatar
-          source={
-            booking.workerImage ? { uri: booking.workerImage } : undefined
-          }
-          name={booking.workerName}
-          size="md"
-        />
-        <View style={styles.headerInfo}>
-          <Text style={styles.workerName}>{booking.workerName}</Text>
-          <Text style={styles.service}>{booking.service}</Text>
-        </View>
-        {getStatusBadge(booking.status)}
-      </View>
+  const getTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const created = new Date(dateString);
+    const diffMs = now.getTime() - created.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
 
-      {/* Details */}
-      <View style={styles.cardDetails}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailIcon}>📅</Text>
-          <Text style={styles.detailText}>
-            {booking.date} • {booking.time}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailIcon}>📍</Text>
-          <Text style={styles.detailText} numberOfLines={1}>
-            {booking.location}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailIcon}>💰</Text>
-          <Text style={styles.amountText}>{booking.amount}</Text>
-        </View>
-      </View>
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  };
 
-      {/* Actions */}
-      <View style={styles.cardActions}>
-        {booking.status === 'upcoming' && (
-          <>
-            <Button
-              title="Contact Worker"
-              variant="outline"
-              size="small"
-              onPress={() => onContactWorker(booking.id)}
-              style={styles.actionButton}
-            />
-            <Button
-              title="Cancel"
-              variant="ghost"
-              size="small"
-              onPress={() => onCancelBooking(booking.id)}
-              style={styles.actionButton}
-            />
-          </>
-        )}
-        {booking.status === 'in_progress' && (
-          <Button
-            title="Track Progress"
-            variant="primary"
-            size="small"
-            onPress={() => onBookingPress(booking.id)}
-            fullWidth
-          />
-        )}
-        {booking.status === 'completed' && (
-          <>
-            <Button
-              title="View Details"
-              variant="outline"
-              size="small"
-              onPress={() => onBookingPress(booking.id)}
-              style={styles.actionButton}
-            />
-            <Button
-              title="⭐ Review"
-              variant="primary"
-              size="small"
-              onPress={() => onLeaveReview(booking.id)}
-              style={styles.actionButton}
-            />
-          </>
-        )}
-        {booking.status === 'pending_payment' && (
-          <Button
-            title="Complete Payment"
-            variant="primary"
-            size="small"
-            onPress={() => onBookingPress(booking.id)}
-            fullWidth
-          />
-        )}
-      </View>
-    </Card>
-  );
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="My Requests" />
+        <LoadingState message="Loading your requests..." />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header
-        title="My Bookings"
-        leftIcon={<Text style={styles.backIcon}>←</Text>}
-        onLeftPress={onBack}
-      />
+      <Header title="My Requests" />
 
       {/* Tabs */}
       <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[styles.tab, selectedTab === 'all' && styles.tabActive]}
+          onPress={() => setSelectedTab('all')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              selectedTab === 'all' && styles.tabTextActive,
+            ]}
+          >
+            All ({requests.length})
+          </Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, selectedTab === 'active' && styles.tabActive]}
           onPress={() => setSelectedTab('active')}
@@ -259,25 +186,15 @@ export const MyBookingsScreen: React.FC<MyBookingsScreenProps> = ({
               selectedTab === 'active' && styles.tabTextActive,
             ]}
           >
-            Active
+            Active (
+            {
+              requests.filter(r =>
+                ['pending', 'quoted', 'accepted'].includes(r.status),
+              ).length
+            }
+            )
           </Text>
-          <View
-            style={[
-              styles.tabBadge,
-              selectedTab === 'active' && styles.tabBadgeActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.tabBadgeText,
-                selectedTab === 'active' && styles.tabBadgeTextActive,
-              ]}
-            >
-              2
-            </Text>
-          </View>
         </TouchableOpacity>
-
         <TouchableOpacity
           style={[styles.tab, selectedTab === 'completed' && styles.tabActive]}
           onPress={() => setSelectedTab('completed')}
@@ -288,25 +205,9 @@ export const MyBookingsScreen: React.FC<MyBookingsScreenProps> = ({
               selectedTab === 'completed' && styles.tabTextActive,
             ]}
           >
-            Completed
+            Completed ({requests.filter(r => r.status === 'completed').length})
           </Text>
-          <View
-            style={[
-              styles.tabBadge,
-              selectedTab === 'completed' && styles.tabBadgeActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.tabBadgeText,
-                selectedTab === 'completed' && styles.tabBadgeTextActive,
-              ]}
-            >
-              1
-            </Text>
-          </View>
         </TouchableOpacity>
-
         <TouchableOpacity
           style={[styles.tab, selectedTab === 'cancelled' && styles.tabActive]}
           onPress={() => setSelectedTab('cancelled')}
@@ -317,12 +218,11 @@ export const MyBookingsScreen: React.FC<MyBookingsScreenProps> = ({
               selectedTab === 'cancelled' && styles.tabTextActive,
             ]}
           >
-            Cancelled
+            Cancelled ({requests.filter(r => r.status === 'cancelled').length})
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Bookings List */}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
@@ -331,26 +231,103 @@ export const MyBookingsScreen: React.FC<MyBookingsScreenProps> = ({
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        {filteredBookings.length > 0 ? (
-          filteredBookings.map(booking => renderBookingCard(booking))
-        ) : (
+        {filteredRequests.length === 0 ? (
           <EmptyState
             icon={
               selectedTab === 'active'
-                ? '📅'
+                ? '📋'
                 : selectedTab === 'completed'
                 ? '✅'
-                : '❌'
+                : selectedTab === 'cancelled'
+                ? '❌'
+                : '📋'
             }
-            title={`No ${selectedTab} bookings`}
-            description={
+            title={
               selectedTab === 'active'
-                ? "You don't have any active bookings at the moment"
+                ? 'No Active Requests'
                 : selectedTab === 'completed'
-                ? "You haven't completed any bookings yet"
-                : "You don't have any cancelled bookings"
+                ? 'No Completed Requests'
+                : selectedTab === 'cancelled'
+                ? 'No Cancelled Requests'
+                : 'No Requests Yet'
+            }
+            description={
+              selectedTab === 'all'
+                ? 'Create your first service request to get started!'
+                : selectedTab === 'active'
+                ? 'You have no active service requests at the moment.'
+                : selectedTab === 'completed'
+                ? 'Your completed requests will appear here.'
+                : 'You have no cancelled requests.'
+            }
+            actionLabel={selectedTab === 'all' ? 'Create Request' : undefined}
+            onAction={
+              selectedTab === 'all'
+                ? () => navigation.navigate('RequestService')
+                : undefined
             }
           />
+        ) : (
+          filteredRequests.map(request => (
+            <TouchableOpacity
+              key={request._id}
+              onPress={() => handleRequestPress(request._id)}
+              activeOpacity={0.7}
+            >
+              <Card style={styles.requestCard}>
+                <View style={styles.requestHeader}>
+                  <View style={styles.requestHeaderLeft}>
+                    <Text style={styles.serviceIcon}>
+                      {getServiceIcon(request.serviceType)}
+                    </Text>
+                    <View style={styles.requestInfo}>
+                      <Text style={styles.serviceName}>
+                        {request.serviceType}
+                      </Text>
+                      <Text style={styles.requestTime}>
+                        {getTimeAgo(request.createdAt)}
+                      </Text>
+                    </View>
+                  </View>
+                  <Badge
+                    label={
+                      request.status.charAt(0).toUpperCase() +
+                      request.status.slice(1)
+                    }
+                    variant={getStatusVariant(request.status)}
+                  />
+                </View>
+
+                <Text style={styles.description} numberOfLines={2}>
+                  {request.description}
+                </Text>
+
+                <View style={styles.requestMeta}>
+                  <View style={styles.metaItem}>
+                    <Text style={styles.metaIcon}>📍</Text>
+                    <Text style={styles.metaText} numberOfLines={1}>
+                      {request.location.address}
+                    </Text>
+                  </View>
+                  <View style={styles.metaItem}>
+                    <Text style={styles.metaIcon}>💰</Text>
+                    <Text style={styles.metaText}>
+                      ₹{request.budget.toLocaleString()}
+                    </Text>
+                  </View>
+                  {request.quotesCount > 0 && (
+                    <View style={styles.metaItem}>
+                      <Text style={styles.metaIcon}>💼</Text>
+                      <Text style={styles.metaText}>
+                        {request.quotesCount} quote
+                        {request.quotesCount > 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </Card>
+            </TouchableOpacity>
+          ))
         )}
       </ScrollView>
     </SafeAreaView>
