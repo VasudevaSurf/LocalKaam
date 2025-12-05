@@ -65,6 +65,18 @@ class SocketService {
       this.socket.off('quote_received');
     }
   }
+
+  public onNewVideo(callback: (video: any) => void): void {
+    if (this.socket) {
+      this.socket.on('new_video', callback);
+    }
+  }
+
+  public offNewVideo(): void {
+    if (this.socket) {
+      this.socket.off('new_video');
+    }
+  }
 }
 
 export default SocketService.getInstance();

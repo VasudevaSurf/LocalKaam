@@ -104,6 +104,17 @@ export const getWorkerVideos = async (userId: string) => {
   }
 };
 
+// Get ALL work videos for browse feed
+export const getAllWorkVideos = async () => {
+  try {
+    const response = await api.get('/work-videos');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching all work videos:', error);
+    return [];
+  }
+};
+
 // Service Request APIs
 export const createServiceRequest = async (requestData: {
   serviceType: string;

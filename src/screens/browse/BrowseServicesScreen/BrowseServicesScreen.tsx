@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,9 @@ import { Button } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
 import { EmptyState } from '../../../components/common/EmptyState';
 import { LoadingState } from '../../../components/common/LoadingState';
+import * as api from '../../../services/api';
+import SocketService from '../../../services/SocketService';
+import { useAuth } from '../../../context/AuthContext';
 
 const CATEGORIES = [
   { id: 'all', label: 'All', icon: '🔧' },
@@ -36,75 +39,6 @@ const SORT_OPTIONS = [
   { id: 'reviews', label: 'Most Reviewed' },
 ];
 
-// Mock Data
-const MOCK_WORKERS = [
-  {
-    id: '1',
-    sellerName: 'Rajesh Kumar',
-    sellerImage: '',
-    service: 'Electrician',
-    rating: 4.8,
-    reviewCount: 156,
-    distance: '2.5 km',
-    price: '₹800/day',
-    verified: true,
-    online: true,
-    images: ['https://picsum.photos/400/300?random=1'],
-  },
-  {
-    id: '2',
-    sellerName: 'Amit Singh',
-    sellerImage: '',
-    service: 'Plumber',
-    rating: 4.6,
-    reviewCount: 98,
-    distance: '3.2 km',
-    price: '₹700/day',
-    verified: true,
-    online: false,
-    images: ['https://picsum.photos/400/300?random=2'],
-  },
-  {
-    id: '3',
-    sellerName: 'Suresh Patel',
-    sellerImage: '',
-    service: 'Painter',
-    rating: 4.9,
-    reviewCount: 203,
-    distance: '1.8 km',
-    price: '₹900/day',
-    verified: true,
-    online: true,
-    images: ['https://picsum.photos/400/300?random=3'],
-  },
-  {
-    id: '4',
-    sellerName: 'Vikram Sharma',
-    sellerImage: '',
-    service: 'Carpenter',
-    rating: 4.7,
-    reviewCount: 134,
-    distance: '4.1 km',
-    price: '₹850/day',
-    verified: false,
-    online: true,
-    images: ['https://picsum.photos/400/300?random=4'],
-  },
-  {
-    id: '5',
-    sellerName: 'Ramesh Gupta',
-    sellerImage: '',
-    service: 'Electrician',
-    rating: 4.5,
-    reviewCount: 87,
-    distance: '5.3 km',
-    price: '₹750/day',
-    verified: true,
-    online: false,
-    images: ['https://picsum.photos/400/300?random=5'],
-  },
-];
-
 export interface BrowseServicesScreenProps {
   onWorkerPress: (workerId: string) => void;
   onBack: () => void;
@@ -114,18 +48,50 @@ export const BrowseServicesScreen: React.FC<BrowseServicesScreenProps> = ({
   onWorkerPress,
   onBack,
 }) => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSort, setSelectedSort] = useState('distance');
   const [showFilters, setShowFilters] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [videos, setVideos] = useState<any[]>([]);
 
   // Filter states
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [onlineOnly, setOnlineOnly] = useState(false);
   const [minRating, setMinRating] = useState(0);
   const [maxDistance, setMaxDistance] = useState(10);
+
+  useEffect(() => {
+    fetchVideos();
+
+    // Connect socket for real-time updates
+    const socket = SocketService.connect();
+
+    // Listen for new videos
+    SocketService.onNewVideo(newVideo => {
+      console.log('[Browse] New video received:', newVideo._id);
+      setVideos(prev => [newVideo, ...prev]);
+    });
+
+    return () => {
+      SocketService.offNewVideo();
+    };
+  }, []);
+
+  const fetchVideos = async () => {
+    setLoading(true);
+    try {
+      const data = await api.getAllWorkVideos();
+      setVideos(data || []);
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   const handleCategorySelect = (categoryId: string) => {
     setSelectedCategory(categoryId);
@@ -137,9 +103,7 @@ export const BrowseServicesScreen: React.FC<BrowseServicesScreenProps> = ({
 
   const handleRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
+    fetchVideos();
   };
 
   const getActiveFilterCount = () => {
@@ -163,31 +127,60 @@ export const BrowseServicesScreen: React.FC<BrowseServicesScreenProps> = ({
     setMaxDistance(10);
   };
 
-  const filteredWorkers = MOCK_WORKERS.filter(worker => {
+  // Filter logic using real video data
+  const filteredVideos = videos.filter(video => {
+    // Category Filter
     if (
       selectedCategory !== 'all' &&
-      worker.service !== CATEGORIES.find(c => c.id === selectedCategory)?.label
+      video.category !==
+        CATEGORIES.find(c => c.id === selectedCategory)?.label &&
+      video.category !== selectedCategory // Fallback check
     ) {
       return false;
     }
-    if (
-      searchQuery &&
-      !worker.sellerName.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !worker.service.toLowerCase().includes(searchQuery.toLowerCase())
-    ) {
+
+    // Search Query
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch =
+      (video.title && video.title.toLowerCase().includes(searchLower)) ||
+      (video.description &&
+        video.description.toLowerCase().includes(searchLower)) ||
+      (video.userId?.name &&
+        video.userId.name.toLowerCase().includes(searchLower)) ||
+      (video.category && video.category.toLowerCase().includes(searchLower));
+
+    if (searchQuery && !matchesSearch) {
       return false;
     }
-    if (verifiedOnly && !worker.verified) {
-      return false;
-    }
-    if (onlineOnly && !worker.online) {
-      return false;
-    }
+
+    // Additional filters (dummy implementation as we don't have all fields on video yet)
+    if (verifiedOnly) return false; // Placeholder
+    if (onlineOnly) return false; // Placeholder
+
     return true;
   });
 
-  if (loading) {
-    return <LoadingState message="Finding workers..." />;
+  // Map video data to ServiceCard props
+  const renderVideoItem = ({ item }: { item: any }) => (
+    <ServiceCard
+      id={item._id}
+      sellerName={item.userId?.name || 'Unknown Worker'}
+      sellerImage={item.userId?.profileImage}
+      service={item.category || 'Service'}
+      rating={4.8} // Placeholder rating
+      reviewCount={12} // Placeholder review count
+      distance="Nearby" // Placeholder distance
+      price="Ask for Quote" // Placeholder price
+      verified={true} // Placeholder
+      online={true} // Placeholder
+      images={[item.thumbnailUrl || item.videoUrl]} // Use thumbnail or video as preview
+      onPress={() => onWorkerPress(item.userId?._id)} // Navigate to worker profile or video detail
+      style={styles.workerCard}
+    />
+  );
+
+  if (loading && !refreshing && videos.length === 0) {
+    return <LoadingState message="Loading videos..." />;
   }
 
   return (
@@ -229,7 +222,7 @@ export const BrowseServicesScreen: React.FC<BrowseServicesScreenProps> = ({
         {/* Results Count and Sort */}
         <View style={styles.resultsHeader}>
           <Text style={styles.resultsCount}>
-            {filteredWorkers.length} workers found
+            {filteredVideos.length} videos found
           </Text>
           <TouchableOpacity style={styles.sortButton} onPress={() => {}}>
             <Text style={styles.sortIcon}>⇅</Text>
@@ -240,17 +233,11 @@ export const BrowseServicesScreen: React.FC<BrowseServicesScreenProps> = ({
         </View>
       </View>
 
-      {/* Workers List */}
+      {/* Videos List */}
       <FlatList
-        data={filteredWorkers}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <ServiceCard
-            {...item}
-            onPress={() => onWorkerPress(item.id)}
-            style={styles.workerCard}
-          />
-        )}
+        data={filteredVideos}
+        keyExtractor={item => item._id}
+        renderItem={renderVideoItem}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -259,7 +246,7 @@ export const BrowseServicesScreen: React.FC<BrowseServicesScreenProps> = ({
         ListEmptyComponent={
           <EmptyState
             icon="🔍"
-            title="No workers found"
+            title="No videos found"
             description="Try adjusting your filters or search in a different area"
             actionLabel="Clear Filters"
             onAction={handleClearFilters}

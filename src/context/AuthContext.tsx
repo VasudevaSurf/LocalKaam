@@ -208,13 +208,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ...userData,
         phoneNumber: user.phoneNumber,
         firebaseUid: getAuth().currentUser?.uid || '',
+        userType: 'customer',
       });
+
+      // Map MongoDB _id to id
+      const mappedUser = {
+        ...updatedProfile,
+        id: updatedProfile._id || updatedProfile.id,
+      };
 
       // Update cache with new data from backend response
       const cacheKey = `customer_profile_${user.phoneNumber}`;
-      await cache.set(cacheKey, updatedProfile);
+      await cache.set(cacheKey, mappedUser);
 
-      dispatch(updateUserSuccess(updatedProfile));
+      dispatch(updateUserSuccess(mappedUser));
       return true;
     } catch (error: any) {
       console.error('Update user error:', error);
