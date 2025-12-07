@@ -62,6 +62,10 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
             icon = '👤';
             activeIcon = '👤';
             break;
+          case 'Reels':
+            icon = '🎬';
+            activeIcon = '🎬';
+            break;
         }
 
         return (

@@ -7,6 +7,7 @@ export type AuthStackParamList = {
 export type MainTabParamList = {
   Home: undefined;
   Browse: undefined;
+  Reels: undefined;
   Bookings: undefined;
   Profile: undefined;
 };
@@ -20,7 +21,8 @@ export type RootStackParamList = {
   // Feature Screens
   RequestService: undefined;
   ActiveRequest: { requestId: string };
-  WorkerProfile: { workerId: string };
+  WorkerProfile: { workerId: string; initialData?: any };
+  VideoDetail: { videoData: any; initialWorkerData?: any };
   BookingConfirmation: {
     workerId: string;
     workerName: string;

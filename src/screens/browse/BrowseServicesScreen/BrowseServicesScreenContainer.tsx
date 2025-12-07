@@ -7,8 +7,11 @@ export const BrowseServicesScreenContainer: React.FC = () => {
 
   return (
     <BrowseServicesScreenComponent
-      onWorkerPress={(workerId: string) =>
-        navigation.navigate('WorkerProfile', { workerId })
+      onWorkerPress={(workerId: string, initialData?: any) =>
+        navigation.navigate('VideoDetail', {
+          videoData: initialData,
+          initialWorkerData: initialData, // Pass same data for worker context
+        })
       }
       onBack={() => navigation.goBack()}
     />

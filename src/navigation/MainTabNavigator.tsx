@@ -8,6 +8,7 @@ import { PostServiceScreenContainer } from '../screens/home/PostServiceScreen/Po
 import { BrowseServicesScreenContainer } from '../screens/browse/BrowseServicesScreen/BrowseServicesScreenContainer';
 import { MyBookingsScreenContainer } from '../screens/bookings/MyBookingsScreen/MyBookingsScreenContainer';
 import { ProfileScreenContainer } from '../screens/profile/ProfileScreen/ProfileScreenContainer';
+import { ReelsScreen } from '../screens/reels/ReelsScreen/ReelsScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -21,6 +22,7 @@ export const MainTabNavigator = () => {
     >
       <Tab.Screen name="Home" component={PostServiceScreenContainer} />
       <Tab.Screen name="Browse" component={BrowseServicesScreenContainer} />
+      <Tab.Screen name="Reels" component={ReelsScreen} />
       <Tab.Screen name="Bookings" component={MyBookingsScreenContainer} />
       <Tab.Screen name="Profile" component={ProfileScreenContainer} />
     </Tab.Navigator>

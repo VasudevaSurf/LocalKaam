@@ -12,6 +12,7 @@ import { MainTabNavigator } from './MainTabNavigator';
 // Feature Screens
 import { RequestServiceScreen, ActiveRequestScreen } from '../screens/request';
 import { WorkerProfileScreen } from '../screens/worker';
+import { VideoDetailScreen } from '../screens/browse/VideoDetailScreen/VideoDetailScreen';
 import {
   BookingConfirmationScreen,
   PaymentSuccessScreen,
@@ -37,7 +38,7 @@ export const AppNavigator = () => {
 
   // Check for active request when user is authenticated
   useEffect(() => {
-    const checkForActiveRequest = async () => {
+    const checkForActiveRequest = async (retryCount = 0) => {
       if (user?.id && user.id !== 'temp_id' && isAuthenticated) {
         try {
           console.log('[AppNavigator] Checking for active request...');
@@ -49,7 +50,23 @@ export const AppNavigator = () => {
             console.log('[AppNavigator] No active request found');
           }
         } catch (error) {
-          console.error('[AppNavigator] Error checking active request:', error);
+          console.error(
+            `[AppNavigator] Error checking active request (Attempt ${
+              retryCount + 1
+            }):`,
+            error,
+          );
+          // Retry logic for startup network race conditions
+          if (retryCount < 3) {
+            const timeout = Math.pow(2, retryCount) * 1000;
+            console.log(`[AppNavigator] Retrying in ${timeout}ms...`);
+            setTimeout(() => {
+              if (isAuthenticated && checkingActiveRequest) {
+                checkForActiveRequest(retryCount + 1);
+              }
+            }, timeout);
+            return; // Don't stop checking yet
+          }
         }
       }
       setCheckingActiveRequest(false);
@@ -125,6 +142,7 @@ export const AppNavigator = () => {
               name="WorkerProfile"
               component={WorkerProfileScreen}
             />
+            <Stack.Screen name="VideoDetail" component={VideoDetailScreen} />
             <Stack.Screen
               name="BookingConfirmation"
               component={BookingConfirmationScreen}

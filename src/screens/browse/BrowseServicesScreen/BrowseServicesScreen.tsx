@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -40,7 +40,7 @@ const SORT_OPTIONS = [
 ];
 
 export interface BrowseServicesScreenProps {
-  onWorkerPress: (workerId: string) => void;
+  onWorkerPress: (workerId: string, initialData?: any) => void;
   onBack: () => void;
 }
 
@@ -62,6 +62,26 @@ export const BrowseServicesScreen: React.FC<BrowseServicesScreenProps> = ({
   const [onlineOnly, setOnlineOnly] = useState(false);
   const [minRating, setMinRating] = useState(0);
   const [maxDistance, setMaxDistance] = useState(10);
+  const [visibleVideoIds, setVisibleVideoIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // Optimizing video playback: Play ALL visible videos (or top 4 to save memory)
+  const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
+    if (viewableItems.length > 0) {
+      // Map all viewable items to a Set for O(1) lookup
+      const visibleIds = new Set(
+        viewableItems
+          .filter((v: any) => v.isViewable)
+          .map((v: any) => v.item._id),
+      );
+      setVisibleVideoIds(visibleIds as Set<string>);
+    }
+  }, []);
+
+  const viewabilityConfig = {
+    itemVisiblePercentThreshold: 60, // Lower threshold for smoother feel
+  };
 
   useEffect(() => {
     fetchVideos();
@@ -85,6 +105,12 @@ export const BrowseServicesScreen: React.FC<BrowseServicesScreenProps> = ({
     try {
       const data = await api.getAllWorkVideos();
       setVideos(data || []);
+      // Auto-play first few videos if data exists
+      if (data && data.length > 0) {
+        // Initial set (first 2 videos)
+        const initialIds = new Set(data.slice(0, 2).map((v: any) => v._id));
+        setVisibleVideoIds(initialIds as Set<string>);
+      }
     } catch (error) {
       console.error('Error fetching videos:', error);
     } finally {
@@ -173,9 +199,12 @@ export const BrowseServicesScreen: React.FC<BrowseServicesScreenProps> = ({
       price="Ask for Quote" // Placeholder price
       verified={true} // Placeholder
       online={true} // Placeholder
-      images={[item.thumbnailUrl || item.videoUrl]} // Use thumbnail or video as preview
-      onPress={() => onWorkerPress(item.userId?._id)} // Navigate to worker profile or video detail
-      style={styles.workerCard}
+      videoUrl={item.videoUrl}
+      images={item.thumbnailUrl ? [item.thumbnailUrl] : []}
+      isPlaying={visibleVideoIds.has(item._id)}
+      poster={item.thumbnailUrl}
+      onPress={() => onWorkerPress(item.userId?._id, item)} // Navigate to worker profile or video detail
+      style={{ flex: 1, margin: 8 }} // Grid item spacing
     />
   );
 
@@ -238,8 +267,16 @@ export const BrowseServicesScreen: React.FC<BrowseServicesScreenProps> = ({
         data={filteredVideos}
         keyExtractor={item => item._id}
         renderItem={renderVideoItem}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingHorizontal: 8 }]} // Adjust padding for grid
         showsVerticalScrollIndicator={false}
+        numColumns={2} // Enable grid layout
+        columnWrapperStyle={{ justifyContent: 'space-between' }} // Space columns evenly
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={3}
+        windowSize={5}
+        initialNumToRender={4} // Render enough for 2 rows
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }

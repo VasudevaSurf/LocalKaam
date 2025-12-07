@@ -12,8 +12,10 @@ export const styles = StyleSheet.create({
   },
   imageContainer: {
     width: '100%',
-    height: getFigmaDimension(180),
+    aspectRatio: 9 / 16, // Vertical video aspect ratio
+    height: undefined, // Let aspect ratio drive height
     position: 'relative',
+    backgroundColor: colors.gray[50], // Background for loading
   },
   image: {
     width: '100%',
@@ -21,23 +23,24 @@ export const styles = StyleSheet.create({
   },
   verifiedBadge: {
     position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
+    top: spacing.xs,
+    right: spacing.xs,
   },
   content: {
-    padding: spacing.lg,
-    gap: spacing.md,
+    padding: spacing.sm,
+    gap: spacing.xs,
   },
   sellerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.xs,
   },
   sellerInfo: {
     flex: 1,
   },
   sellerName: {
-    ...typography.h4,
+    ...typography.bodyMedium, // Smaller font for grid
+    fontFamily: typography.buttonMedium.fontFamily,
     color: colors.textPrimary,
   },
   service: {
@@ -61,7 +64,7 @@ export const styles = StyleSheet.create({
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 2, // Tighter gap
   },
   starIcon: {
     fontSize: getFigmaDimension(14),

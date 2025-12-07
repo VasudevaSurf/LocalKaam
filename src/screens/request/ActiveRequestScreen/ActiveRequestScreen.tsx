@@ -6,7 +6,10 @@ import {
   SafeAreaView,
   RefreshControl,
   Alert,
+  Modal,
+  TouchableOpacity,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../navigation/types';
@@ -17,6 +20,7 @@ import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/common/EmptyState';
 import { LoadingState } from '../../../components/common/LoadingState';
+import { colors as COLORS } from '../../../theme';
 import * as api from '../../../services/api';
 import SocketService from '../../../services/SocketService';
 
@@ -35,8 +39,23 @@ interface ServiceRequest {
   urgency: string;
   status: string;
   quotesCount: number;
+  otp?: string;
   createdAt: string;
   updatedAt: string;
+  workerId?: {
+    _id: string;
+    name: string;
+    phoneNumber: string;
+    profileImage?: string;
+    skill?: string;
+    rating?: number;
+    jobsCount?: number;
+  };
+  customerId?: {
+    _id: string;
+    name: string;
+    profileImage?: string;
+  };
 }
 
 type ActiveRequestScreenNavigationProp = NativeStackNavigationProp<
@@ -58,14 +77,28 @@ export const ActiveRequestScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Rating State
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [submittingRating, setSubmittingRating] = useState(false);
+
+  // Quotes State
+  const [quotes, setQuotes] = useState<any[]>([]);
+  // Alias quotes to activeQuotes for compatibility with rendering logic
+  const activeQuotes = quotes;
+  const [now, setNow] = useState(Date.now());
 
   const fetchRequestDetails = async () => {
     try {
       setError(null);
-      const data = await api.getServiceRequest(requestId);
-      setRequest(data);
+      const [requestData, quotesData] = await Promise.all([
+        api.getServiceRequest(requestId),
+        api.getRequestQuotes(requestId),
+      ]);
+      setRequest(requestData);
+      setQuotes(quotesData || []);
     } catch (err: any) {
-      console.error('[ActiveRequest] Error fetching request:', err);
+      console.error('[ActiveRequest] Error fetching request details:', err);
       setError('Failed to load request details');
     } finally {
       setLoading(false);
@@ -74,6 +107,66 @@ export const ActiveRequestScreen: React.FC = () => {
 
   useEffect(() => {
     fetchRequestDetails();
+  }, [requestId]);
+
+  useEffect(() => {
+    // Socket connection
+    const socket = SocketService.connect();
+    SocketService.joinRequestRoom(requestId);
+
+    SocketService.onQuoteReceived(data => {
+      console.log('[ActiveRequest] Quote received:', data);
+      const newQuote = data.quote;
+
+      setQuotes(prev => {
+        const exists = prev.find(q => q._id === newQuote._id);
+        if (exists) {
+          return prev.map(q => (q._id === newQuote._id ? newQuote : q));
+        }
+        return [newQuote, ...prev];
+      });
+
+      setRequest(prev => {
+        if (!prev) return prev;
+        return { ...prev, quotesCount: (prev.quotesCount || 0) + 1 };
+      });
+    });
+
+    socket.on('request_accepted', data => {
+      console.log('[ActiveRequest] Request accepted:', data);
+      setRequest(data.updatedRequest);
+      fetchRequestDetails();
+      Alert.alert('Success', 'You have accepted the offer!');
+    });
+
+    socket.on('job_cancelled_by_worker', data => {
+      console.log('[ActiveRequest] Job cancelled by worker:', data);
+      setRequest(data.updatedRequest);
+      fetchRequestDetails();
+      Alert.alert(
+        'Job Cancelled',
+        'The assigned worker has cancelled the job. Your request is now active for other workers to quote.',
+      );
+    });
+
+    socket.on('job_completed', data => {
+      console.log('[ActiveRequest] Job completed:', data);
+      setRequest(data.updatedRequest);
+      setShowRatingModal(true);
+    });
+
+    // Timer for updates (if needed for relative time, else can remove)
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => {
+      SocketService.offQuoteReceived();
+      socket.off('request_accepted');
+      socket.off('job_cancelled_by_worker');
+      socket.off('job_completed');
+      clearInterval(timer);
+    };
   }, [requestId]);
 
   const handleRefresh = async () => {
@@ -93,16 +186,27 @@ export const ActiveRequestScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
+              setLoading(true);
               await api.cancelServiceRequest(requestId);
-              Alert.alert('Success', 'Request cancelled successfully');
               navigation.goBack();
             } catch (err) {
               Alert.alert('Error', 'Failed to cancel request');
+              setLoading(false);
             }
           },
         },
       ],
     );
+  };
+
+  const getUrgencyLabel = (urgency: string) => {
+    const labels: Record<string, string> = {
+      asap: 'ASAP',
+      today: 'Today',
+      tomorrow: 'Tomorrow',
+      scheduled: 'Scheduled',
+    };
+    return labels[urgency] || urgency;
   };
 
   const getServiceIcon = (serviceType: string) => {
@@ -118,16 +222,6 @@ export const ActiveRequestScreen: React.FC = () => {
     return icons[serviceType] || '🔧';
   };
 
-  const getUrgencyLabel = (urgency: string) => {
-    const labels: Record<string, string> = {
-      asap: 'ASAP',
-      today: 'Today',
-      tomorrow: 'Tomorrow',
-      scheduled: 'Scheduled',
-    };
-    return labels[urgency] || urgency;
-  };
-
   const getTimeAgo = (dateString: string) => {
     const now = new Date();
     const created = new Date(dateString);
@@ -141,61 +235,115 @@ export const ActiveRequestScreen: React.FC = () => {
     return `${diffDays}d ago`;
   };
 
-  // Real-time quotes state
-  const [realTimeQuotes, setRealTimeQuotes] = useState<
-    Array<{
-      quote: any;
-      expiresAt: number;
-    }>
-  >([]);
-  const [now, setNow] = useState(Date.now());
+  const handleRateWorker = async () => {
+    if (rating === 0) {
+      Alert.alert('Required', 'Please select a star rating.');
+      return;
+    }
+    // @ts-ignore
+    const workerId = request?.workerId?._id || request?.workerId;
+    if (!workerId) return;
 
-  useEffect(() => {
-    // Listen for request accepted event
-    const socket = SocketService.connect();
-    SocketService.joinRequestRoom(requestId);
+    try {
+      setSubmittingRating(true);
+      // @ts-ignore
+      const customerId = request.customerId?._id || request.customerId;
+      await api.rateWorker(workerId, rating, customerId, request._id);
+      setShowRatingModal(false);
+      Alert.alert('Thank You', 'Your rating has been submitted.', [
+        { text: 'OK', onPress: () => navigation.navigate('Main') },
+      ]);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to submit rating');
+    } finally {
+      setSubmittingRating(false);
+    }
+  };
 
-    SocketService.onQuoteReceived(data => {
-      console.log('[ActiveRequest] Quote received:', data);
-      const newQuote = data.quote;
+  const renderRatingModal = () => (
+    <Modal
+      visible={showRatingModal}
+      transparent
+      animationType="slide"
+      onRequestClose={() => {}} // Prevent back button closing
+    >
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          justifyContent: 'center',
+          padding: 20,
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: 'white',
+            borderRadius: 16,
+            padding: 24,
+            alignItems: 'center',
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: 'bold',
+              marginBottom: 8,
+              color: COLORS.textPrimary,
+            }}
+          >
+            Job Completed!
+          </Text>
+          <Text
+            style={{
+              textAlign: 'center',
+              color: COLORS.textSecondary,
+              marginBottom: 24,
+            }}
+          >
+            How was your experience with the worker?
+          </Text>
 
-      // Add to list with 15s expiration
-      setRealTimeQuotes(prev => {
-        // Remove existing quote from same worker if any (update case)
-        const filtered = prev.filter(
-          q => q.quote.workerId !== newQuote.workerId,
-        );
-        return [
-          {
-            quote: newQuote,
-            expiresAt: Date.now() + 15000, // 15 seconds from now
-          },
-          ...filtered,
-        ];
-      });
-    });
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'center',
+              gap: 12,
+              marginBottom: 32,
+            }}
+          >
+            {[1, 2, 3, 4, 5].map(star => (
+              <TouchableOpacity key={star} onPress={() => setRating(star)}>
+                <Text
+                  style={{
+                    fontSize: 40,
+                    color: star <= rating ? COLORS.star : '#E5E7EB',
+                  }}
+                >
+                  ★
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-    socket.on('request_accepted', data => {
-      console.log('[ActiveRequest] Request accepted:', data);
-      setRequest(data.updatedRequest);
-      setRealTimeQuotes([]);
-      Alert.alert('Success', 'You have accepted the offer!');
-    });
-
-    // Update timer every second
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-
-    return () => {
-      SocketService.offQuoteReceived();
-      socket.off('request_accepted');
-      clearInterval(timer);
-    };
-  }, [requestId]);
-
-  // Filter out expired quotes
-  const activeQuotes = realTimeQuotes.filter(q => q.expiresAt > now);
+          <Button
+            title={submittingRating ? 'Submitting...' : 'Submit Rating'}
+            onPress={handleRateWorker}
+            disabled={submittingRating}
+            fullWidth
+          />
+          <TouchableOpacity
+            style={{ marginTop: 16 }}
+            onPress={() => {
+              setShowRatingModal(false);
+              navigation.navigate('Main');
+            }}
+          >
+            <Text style={{ color: COLORS.textSecondary }}>Skip</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   const handleAcceptQuote = async (quote: any) => {
     Alert.alert(
@@ -278,6 +426,7 @@ export const ActiveRequestScreen: React.FC = () => {
           }
         }}
       />
+      {renderRatingModal()}
 
       <ScrollView
         style={styles.scrollView}
@@ -361,12 +510,93 @@ export const ActiveRequestScreen: React.FC = () => {
         </Card>
 
         {/* Quotes Section or Cancelled/Accepted Message */}
-        {request.status === 'accepted' && request.workerId ? (
+        {request.status === 'completed' ? (
+          <View>
+            <Card
+              style={{
+                padding: 24,
+                alignItems: 'center',
+                backgroundColor: '#F0FDF4',
+                borderColor: COLORS.success,
+                borderWidth: 1,
+              }}
+            >
+              <View
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 40,
+                  backgroundColor: COLORS.success,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 16,
+                }}
+              >
+                <Icon name="check-bold" size={40} color={COLORS.white} />
+              </View>
+              <Text
+                style={{
+                  fontSize: 24,
+                  fontWeight: 'bold',
+                  color: COLORS.success,
+                  marginBottom: 8,
+                }}
+              >
+                Job Completed!
+              </Text>
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: COLORS.textSecondary,
+                  textAlign: 'center',
+                  marginBottom: 24,
+                }}
+              >
+                The work has been verified and marked as complete.
+              </Text>
+
+              {/* @ts-ignore */}
+              <Text style={{ fontSize: 14, color: COLORS.textPrimary }}>
+                Completed by {request.workerId?.name || 'Worker'}
+              </Text>
+            </Card>
+          </View>
+        ) : request.status === 'accepted' && request.workerId ? (
           <View>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Assigned Worker</Text>
               <Badge label="Accepted" variant="success" />
             </View>
+
+            {/* OTP Display Card */}
+            {request.otp && (
+              <Card
+                style={{
+                  marginBottom: 16,
+                  backgroundColor: '#E3F2FD',
+                  borderColor: '#BBDEFB',
+                  borderWidth: 1,
+                }}
+              >
+                <View style={{ alignItems: 'center', padding: 8 }}>
+                  <Text
+                    style={{ fontSize: 14, color: '#1976D2', marginBottom: 4 }}
+                  >
+                    Share this code with worker to start/complete job
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 32,
+                      fontWeight: 'bold',
+                      letterSpacing: 8,
+                      color: '#1565C0',
+                    }}
+                  >
+                    {request.otp}
+                  </Text>
+                </View>
+              </Card>
+            )}
 
             <Card style={styles.workerProfileCard}>
               <View style={styles.workerProfileHeader}>
@@ -455,48 +685,53 @@ export const ActiveRequestScreen: React.FC = () => {
                 description="New quotes will appear here instantly."
               />
             ) : (
-              activeQuotes.map((item, index) => {
-                const timeLeft = Math.max(
-                  0,
-                  Math.ceil((item.expiresAt - now) / 1000),
-                );
+              activeQuotes.map((quote, index) => {
                 return (
-                  <Card key={item.quote._id || index} style={styles.quoteCard}>
+                  <Card key={quote._id || index} style={styles.quoteCard}>
                     <View style={styles.quoteHeader}>
                       <View style={styles.workerInfo}>
                         <View style={styles.workerAvatar}>
                           <Text style={styles.workerInitials}>
-                            {item.quote.workerName?.charAt(0) || 'W'}
+                            {quote.workerName?.charAt(0) || 'W'}
                           </Text>
                         </View>
                         <View>
                           <Text style={styles.workerName}>
-                            {item.quote.workerName}
+                            {quote.workerName}
                           </Text>
                           <Text style={styles.workerRating}>
                             ⭐ 4.8 (12 jobs)
                           </Text>
                         </View>
                       </View>
-                      <View style={styles.timerBadge}>
-                        <Text style={styles.timerText}>{timeLeft}s</Text>
+                      <View
+                        style={[
+                          styles.timerBadge,
+                          { backgroundColor: COLORS.success + '20' },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.timerText, { color: COLORS.success }]}
+                        >
+                          Active
+                        </Text>
                       </View>
                     </View>
 
                     <View style={styles.quoteContent}>
                       <Text style={styles.quotePrice}>
-                        ₹{item.quote.quotedPrice}
+                        ₹{quote.quotedPrice}
                       </Text>
-                      {item.quote.message ? (
+                      {quote.message ? (
                         <Text style={styles.quoteMessage}>
-                          "{item.quote.message}"
+                          "{quote.message}"
                         </Text>
                       ) : null}
                     </View>
 
                     <Button
                       title="Accept Offer"
-                      onPress={() => handleAcceptQuote(item.quote)}
+                      onPress={() => handleAcceptQuote(quote)}
                       style={styles.acceptButton}
                     />
                   </Card>

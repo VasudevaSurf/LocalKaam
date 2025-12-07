@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, ViewStyle } from 'react-native';
+import Video from 'react-native-video';
 import { styles } from './ServiceCard.styles';
 import { Badge } from '../../ui/Badge';
 import { Avatar } from '../../ui/Avatar';
@@ -16,6 +17,9 @@ export interface ServiceCardProps {
   verified?: boolean;
   online?: boolean;
   images?: string[];
+  videoUrl?: string;
+  isPlaying?: boolean;
+  poster?: string;
   onPress?: () => void;
   style?: ViewStyle;
 }
@@ -32,6 +36,9 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
   verified = false,
   online = false,
   images = [],
+  videoUrl,
+  isPlaying = false,
+  poster,
   onPress,
   style,
 }) => {
@@ -41,21 +48,32 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
       onPress={onPress}
       activeOpacity={0.8}
     >
-      {/* Image Section */}
-      {images.length > 0 && (
-        <View style={styles.imageContainer}>
+      {/* Media Section */}
+      <View style={styles.imageContainer}>
+        {videoUrl ? (
+          <Video
+            source={{ uri: videoUrl }}
+            style={styles.image}
+            resizeMode="cover"
+            repeat
+            muted
+            paused={!isPlaying}
+            poster={poster || (images.length > 0 ? images[0] : undefined)}
+            posterResizeMode="cover"
+          />
+        ) : images.length > 0 ? (
           <Image
             source={{ uri: images[0] }}
             style={styles.image}
             resizeMode="cover"
           />
-          {verified && (
-            <View style={styles.verifiedBadge}>
-              <Badge label="✓ Verified" variant="success" size="small" />
-            </View>
-          )}
-        </View>
-      )}
+        ) : null}
+        {verified && (
+          <View style={styles.verifiedBadge}>
+            <Badge label="✓ Verified" variant="success" size="small" />
+          </View>
+        )}
+      </View>
 
       {/* Content Section */}
       <View style={styles.content}>
@@ -85,12 +103,6 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
             <Text style={styles.reviewCount}>({reviewCount})</Text>
           </View>
           <Text style={styles.distance}>📍 {distance}</Text>
-        </View>
-
-        {/* Price */}
-        <View style={styles.priceRow}>
-          <Text style={styles.priceLabel}>Starting from</Text>
-          <Text style={styles.price}>{price}</Text>
         </View>
       </View>
     </TouchableOpacity>

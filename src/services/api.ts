@@ -45,6 +45,16 @@ export const getProfile = async (phoneNumber: string) => {
   }
 };
 
+export const getWorkerById = async (workerId: string) => {
+  try {
+    const response = await api.get(`/profile/${workerId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching worker by ID:', error);
+    return null;
+  }
+};
+
 export const updateProfile = async (userData: any) => {
   try {
     const response = await api.post('/profile', {
@@ -153,6 +163,16 @@ export const getServiceRequest = async (requestId: string) => {
   }
 };
 
+export const getRequestQuotes = async (requestId: string) => {
+  try {
+    const response = await api.get(`/quotes/request/${requestId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching request quotes:', error);
+    return [];
+  }
+};
+
 export const updateServiceRequest = async (
   requestId: string,
   updates: { status?: string; quotesCount?: number },
@@ -192,6 +212,28 @@ export const acceptQuote = async (quoteId: string) => {
     return response.data;
   } catch (error) {
     console.error('Error accepting quote:', error);
+    throw error;
+  }
+};
+
+// Rate Worker
+// Rate Worker
+export const rateWorker = async (
+  workerId: string,
+  rating: number,
+  customerId?: string,
+  requestId?: string,
+) => {
+  try {
+    const response = await api.post('/profile/rate', {
+      workerId,
+      rating,
+      customerId,
+      requestId,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error rating worker:', error);
     throw error;
   }
 };
