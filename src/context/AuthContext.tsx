@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as api from '../services/api';
+import NotificationService from '../services/NotificationService';
 import auth, { getAuth } from '@react-native-firebase/auth';
 import storage from '@react-native-firebase/storage';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -69,6 +70,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Refresh profile on app start if user is logged in
       if (user?.phoneNumber) {
         await refreshUserProfile();
+        // Register FCM if we have a user ID (mapped from _id)
+        if (user.id) {
+          NotificationService.registerAppWithFCM(user.id);
+        }
       }
       setIsInitialized(true);
     };
@@ -158,6 +163,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           await cache.set(cacheKey, mappedUser);
           dispatch(setUser(mappedUser));
           dispatch(loginSuccess('mock_token_123'));
+          // Register FCM
+          if (mappedUser.id) {
+            NotificationService.registerAppWithFCM(mappedUser.id);
+          }
           return true;
         }
       } catch (error: any) {

@@ -2,7 +2,8 @@ import axios from 'axios';
 import { getAuth, getIdToken } from '@react-native-firebase/auth';
 
 // Use the same IP as LocalKaamWorker
-const API_URL = 'https://localkaamserver.onrender.com/api';
+// Use the same IP as LocalKaamWorker
+const API_URL = 'https://localkaamserver-lpvt.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -235,6 +236,19 @@ export const rateWorker = async (
   } catch (error) {
     console.error('Error rating worker:', error);
     throw error;
+  }
+};
+
+export const updateFcmToken = async (userId: string, fcmToken: string) => {
+  try {
+    const response = await api.put('/profile/fcm-token', {
+      userId,
+      fcmToken,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating FCM token:', error);
+    // Don't throw, just log
   }
 };
 

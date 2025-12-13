@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './types';
 import { useAuth } from '../context/AuthContext';
 import * as api from '../services/api';
+import NotificationService from '../services/NotificationService';
 
 // Stacks
 import { AuthStack } from './AuthStack';
@@ -35,6 +36,58 @@ export const AppNavigator = () => {
   const { isAuthenticated, isInitialized, user } = useAuth();
   const [checkingActiveRequest, setCheckingActiveRequest] = useState(true);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
+
+  // Notification Handling
+  const navigationRef = React.useRef<any>(null);
+  const [pendingNotification, setPendingNotification] = useState<any>(null);
+
+  // 1. Check Initial Notification (Quit State) ON MOUNT
+  useEffect(() => {
+    NotificationService.checkInitialNotification(remoteMessage => {
+      console.log(
+        '[AppNavigator] Queuing initial notification:',
+        remoteMessage,
+      );
+      setPendingNotification(remoteMessage);
+    });
+  }, []);
+
+  // 2. Handle Notification Navigation (Foreground/Background/Pending)
+  useEffect(() => {
+    if (!isAuthenticated || !isInitialized) return;
+
+    const handleNotification = (remoteMessage: any) => {
+      console.log('[AppNavigator] Handling notification:', remoteMessage);
+      const { requestId, type } = remoteMessage.data || {};
+
+      if (type === 'NEW_QUOTE' && requestId && navigationRef.current) {
+        // Navigate to Active Request Screen which shows quotes
+        navigationRef.current?.navigate('ActiveRequest', {
+          requestId: requestId,
+        });
+      }
+    };
+
+    // Process Pending Notification if any
+    if (pendingNotification) {
+      console.log('[AppNavigator] Processing pending notification');
+      handleNotification(pendingNotification);
+      setPendingNotification(null);
+    }
+
+    // 2. Background State
+    const unsubscribeBackground =
+      NotificationService.onNotificationOpenedApp(handleNotification);
+
+    // 3. Foreground State
+    const unsubscribeForeground =
+      NotificationService.setupForegroundHandler(handleNotification);
+
+    return () => {
+      unsubscribeBackground();
+      unsubscribeForeground();
+    };
+  }, [isAuthenticated, isInitialized, pendingNotification]);
 
   // Check for active request when user is authenticated
   useEffect(() => {
@@ -86,7 +139,7 @@ export const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,

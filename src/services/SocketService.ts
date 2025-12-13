@@ -2,7 +2,7 @@ import io, { Socket } from 'socket.io-client';
 
 // Replace with your actual server URL
 // For Android emulator, use 10.0.2.2 instead of localhost
-const SERVER_URL = 'https://localkaamserver.onrender.com'; 
+const SERVER_URL = 'https://localkaamserver-lpvt.onrender.com';
 
 class SocketService {
   private socket: Socket | null = null;
