@@ -60,7 +60,13 @@ export const AppNavigator = () => {
       console.log('[AppNavigator] Handling notification:', remoteMessage);
       const { requestId, type } = remoteMessage.data || {};
 
-      if (type === 'NEW_QUOTE' && requestId && navigationRef.current) {
+      if (
+        (type === 'NEW_QUOTE' ||
+          type === 'JOB_COMPLETED' ||
+          type === 'JOB_CANCELLED_WORKER') &&
+        requestId &&
+        navigationRef.current
+      ) {
         // Navigate to Active Request Screen which shows quotes
         navigationRef.current?.navigate('ActiveRequest', {
           requestId: requestId,

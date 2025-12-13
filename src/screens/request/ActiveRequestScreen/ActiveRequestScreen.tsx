@@ -642,6 +642,16 @@ export const ActiveRequestScreen: React.FC = () => {
                     )
                   }
                 />
+                <Button
+                  title="Cancel Job"
+                  variant="ghost"
+                  style={[
+                    styles.actionButton,
+                    { marginTop: 8, borderColor: COLORS.error, borderWidth: 1 },
+                  ]}
+                  textStyle={{ color: COLORS.error }}
+                  onPress={handleCancelRequest}
+                />
               </View>
             </Card>
           </View>
