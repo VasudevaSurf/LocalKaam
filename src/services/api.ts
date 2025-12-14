@@ -130,10 +130,10 @@ export const getAllWorkVideos = async () => {
 export const createServiceRequest = async (requestData: {
   serviceType: string;
   description: string;
-  location: string;
+  location: any; // String or Object
   budget: number;
   urgency: string;
-  scheduledDate?: string;
+  scheduledDate?: Date;
 }) => {
   try {
     const response = await api.post('/service-requests', requestData);

@@ -37,7 +37,7 @@
       tools:replace="android:resource" />
     <meta-data
       android:name="com.google.firebase.messaging.default_notification_channel_id"
-      android:value="job_updates_v1"
+      android:value="customer_alerts_v1"
       tools:replace="android:value" />
 
     <!-- Google Maps API Key -->

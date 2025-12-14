@@ -1,8 +1,29 @@
 import messaging from '@react-native-firebase/messaging';
+import notifee, {
+  AndroidImportance,
+  AndroidVisibility,
+} from '@notifee/react-native';
 import { updateFcmToken } from './api';
-import { Alert, Platform, PermissionsAndroid } from 'react-native';
+import { Platform, PermissionsAndroid } from 'react-native';
 
 class NotificationService {
+  constructor() {
+    this.createDefaultChannel();
+  }
+
+  async createDefaultChannel() {
+    await notifee.createChannel({
+      id: 'customer_alerts_v1',
+      name: 'Customer Alerts',
+      sound: 'job_alert_sound',
+      importance: AndroidImportance.HIGH,
+      visibility: AndroidVisibility.PUBLIC,
+      vibration: true,
+      vibrationPattern: [300, 500],
+    });
+    console.log('[NotificationService] Channel "customer_alerts_v1" created');
+  }
+
   async requestUserPermission() {
     // Android 13+ requires runtime permission for notifications
     if (Platform.OS === 'android' && Platform.Version >= 33) {
@@ -48,6 +69,7 @@ class NotificationService {
       const hasPermission = await this.requestUserPermission();
 
       if (hasPermission) {
+        await this.createDefaultChannel();
         const fcmToken = await this.getFCMToken();
         if (fcmToken) {
           // Send to backend
@@ -64,50 +86,100 @@ class NotificationService {
     return messaging().onMessage(async remoteMessage => {
       console.log('[NotificationService] Foreground Message:', remoteMessage);
 
+      // Display notification using Notifee to ensure sound plays
       if (remoteMessage.notification) {
-        Alert.alert(
-          remoteMessage.notification.title || 'New Notification',
-          remoteMessage.notification.body || '',
-          [
-            { text: 'Dismiss', style: 'cancel' },
-            {
-              text: 'View',
-              onPress: () => {
-                if (onNotification) {
-                  onNotification(remoteMessage);
-                }
-              },
+        await notifee.displayNotification({
+          title: remoteMessage.notification.title,
+          body: remoteMessage.notification.body,
+          data: remoteMessage.data,
+          android: {
+            channelId: 'customer_alerts_v1',
+            smallIcon: 'ic_launcher', // Ensure this exists or use default
+            pressAction: {
+              id: 'default',
             },
-          ],
-        );
+            // Explicitly set sound again just in case (channel dictates it mainly)
+            sound: 'job_alert_sound',
+          },
+        });
+      }
+
+      // Also trigger callback for in-app UI updates if needed
+      if (onNotification) {
+        onNotification(remoteMessage);
       }
     });
   }
 
   // Handle background state opening (App in background -> Tap -> Open)
   onNotificationOpenedApp(onOpen: (remoteMessage: any) => void) {
-    return messaging().onNotificationOpenedApp(remoteMessage => {
-      console.log(
-        '[NotificationService] Notification caused app to open from background state:',
-        remoteMessage,
-      );
-      if (remoteMessage) {
+    // 1. Firebase Background Tap
+    const unsubscribeFirebase = messaging().onNotificationOpenedApp(
+      remoteMessage => {
+        console.log(
+          '[NotificationService] Firebase Background Open:',
+          remoteMessage,
+        );
+        if (remoteMessage) onOpen(remoteMessage);
+      },
+    );
+
+    // 2. Notifee Foreground/Background Tap (since we display it manually now)
+    const unsubscribeNotifee = notifee.onForegroundEvent(({ type, detail }) => {
+      if (type === 1 && detail.notification) {
+        // PRESS event
+        console.log(
+          '[NotificationService] Notifee Foreground Tap:',
+          detail.notification,
+        );
+        const remoteMessage = {
+          data: detail.notification.data,
+          notification: {
+            title: detail.notification.title,
+            body: detail.notification.body,
+          },
+        };
         onOpen(remoteMessage);
       }
     });
+
+    return () => {
+      unsubscribeFirebase();
+      unsubscribeNotifee();
+    };
   }
 
   // Handle quit state opening (App killed -> Tap -> Open)
   async checkInitialNotification(onOpen: (remoteMessage: any) => void) {
+    // Check Firebase
     const remoteMessage = await messaging().getInitialNotification();
     if (remoteMessage) {
       console.log(
-        '[NotificationService] Notification caused app to open from quit state:',
+        '[NotificationService] Notification caused app to open from quit state (Firebase):',
         remoteMessage.notification,
       );
       onOpen(remoteMessage);
       return remoteMessage;
     }
+
+    // Check Notifee (if launched via local notification press)
+    const initialNotification = await notifee.getInitialNotification();
+    if (initialNotification) {
+      console.log(
+        '[NotificationService] Notification caused app to open from quit state (Notifee):',
+        initialNotification.notification,
+      );
+      const rMessage = {
+        data: initialNotification.notification.data,
+        notification: {
+          title: initialNotification.notification.title,
+          body: initialNotification.notification.body,
+        },
+      };
+      onOpen(rMessage);
+      return rMessage;
+    }
+
     return null;
   }
 }

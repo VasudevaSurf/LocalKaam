@@ -40,6 +40,9 @@ export const AppNavigator = () => {
 
   // 1. Check Initial Notification (Quit State) ON MOUNT
   useEffect(() => {
+    // Force explicit channel creation to ensure customer_alerts_v1 is registered
+    NotificationService.createDefaultChannel();
+
     NotificationService.checkInitialNotification(remoteMessage => {
       console.log(
         '[AppNavigator] Queuing initial notification:',

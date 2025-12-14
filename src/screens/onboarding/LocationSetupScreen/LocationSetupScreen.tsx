@@ -99,23 +99,18 @@ export const LocationSetupScreen: React.FC = () => {
   // Fetch Address on Map Drag Stop
   useEffect(() => {
     // Only fetch if NOT currently showing predictions (user dragging map manually)
-    // and if we aren't in the middle of a "selection" flow ideally, but debouncing helps.
+    // AND we are NOT in a selection flow (programmatic move)
     if (debouncedCenter && !showPredictions && !isSelectionRef.current) {
       setAddressLoading(true);
       fetchAddress(debouncedCenter.latitude, debouncedCenter.longitude);
-    }
-    // Reset selection ref after some time or just rely on predictions closed
-    if (isSelectionRef.current) {
-      setTimeout(() => {
-        isSelectionRef.current = false;
-      }, 1000); // Debounce guard
     }
   }, [debouncedCenter]);
 
   // Fetch Autocomplete Predictions
   useEffect(() => {
     if (isSelectionRef.current) {
-      // Skip search if we just selected an item
+      // If we just selected, ensure list is CLOSED and predictions CLEARED
+      setShowPredictions(false);
       return;
     }
     if (debouncedSearch && debouncedSearch.length > 2) {
@@ -127,9 +122,13 @@ export const LocationSetupScreen: React.FC = () => {
   }, [debouncedSearch]);
 
   const fetchPredictions = async (query: string) => {
+    // Double check ref before fetching
+    if (isSelectionRef.current) return;
     const results = await api.searchPlaces(query);
-    setPredictions(results);
-    setShowPredictions(true);
+    if (!isSelectionRef.current) {
+      setPredictions(results);
+      setShowPredictions(true);
+    }
   };
 
   const fetchAddress = async (lat: number, lng: number) => {
@@ -158,9 +157,51 @@ export const LocationSetupScreen: React.FC = () => {
     });
   };
 
-  const onRegionChange = () => {
-    // Optional: Set loading true immediately on drag start?
-    // Might be too flickering. Let's stick to debounced fetch.
+  const onPanDrag = () => {
+    // User is manually dragging, so unlock any selection lock
+    isSelectionRef.current = false;
+  };
+
+  const requestLocationPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        );
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          getCurrentLocation();
+        }
+      } catch (err) {
+        console.warn(err);
+      }
+    } else {
+      getCurrentLocation();
+    }
+  };
+
+  const getCurrentLocation = () => {
+    setDetecting(true);
+    isSelectionRef.current = false; // Allow updates
+    Geolocation.getCurrentPosition(
+      position => {
+        const { latitude, longitude } = position.coords;
+        const newRegion = {
+          latitude,
+          longitude,
+          latitudeDelta: LATITUDE_DELTA,
+          longitudeDelta: LONGITUDE_DELTA,
+        };
+        setRegion(newRegion);
+        mapRef.current?.animateToRegion(newRegion, 1000);
+        setDetecting(false);
+      },
+      error => {
+        console.error(error);
+        setDetecting(false);
+        Alert.alert('Error', 'Could not detect location.');
+      },
+      { enableHighAccuracy: false, timeout: 20000, maximumAge: 1000 },
+    );
   };
 
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -188,6 +229,15 @@ export const LocationSetupScreen: React.FC = () => {
 
         const { lat, lng } = details;
 
+        // FAILSAFE: If critical details are missing from Places API, force a Reverse Geocode
+        // This handles cases where the Place result is just a point without full address components
+        if (!details.city && !details.pincode) {
+          console.log(
+            'Incomplete place details, falling back to reverse geocode',
+          );
+          fetchAddress(lat, lng);
+        }
+
         // Move the map
         const newRegion = {
           latitude: lat,
@@ -208,52 +258,11 @@ export const LocationSetupScreen: React.FC = () => {
       Alert.alert('Error', 'Failed to load location.');
     } finally {
       setAddressLoading(false);
-      // Ensure manual drag re-enables
+      // Reset selection lock after animation + buffer to allow manual drag later
       setTimeout(() => {
         isSelectionRef.current = false;
-      }, 1500);
+      }, 2000);
     }
-  };
-
-  const requestLocationPermission = async () => {
-    if (Platform.OS === 'android') {
-      try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        );
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          getCurrentLocation();
-        }
-      } catch (err) {
-        console.warn(err);
-      }
-    } else {
-      getCurrentLocation();
-    }
-  };
-
-  const getCurrentLocation = () => {
-    setDetecting(true);
-    Geolocation.getCurrentPosition(
-      position => {
-        const { latitude, longitude } = position.coords;
-        const newRegion = {
-          latitude,
-          longitude,
-          latitudeDelta: LATITUDE_DELTA,
-          longitudeDelta: LONGITUDE_DELTA,
-        };
-        setRegion(newRegion);
-        mapRef.current?.animateToRegion(newRegion, 1000);
-        setDetecting(false);
-      },
-      error => {
-        console.error(error);
-        setDetecting(false);
-        Alert.alert('Error', 'Could not detect location.');
-      },
-      { enableHighAccuracy: false, timeout: 20000, maximumAge: 1000 },
-    );
   };
 
   const handleContinue = async () => {
@@ -326,6 +335,7 @@ export const LocationSetupScreen: React.FC = () => {
             style={StyleSheet.absoluteFillObject}
             initialRegion={region}
             onRegionChangeComplete={onRegionChangeComplete}
+            onPanDrag={onPanDrag}
             showsUserLocation={false}
             showsMyLocationButton={false}
           />
@@ -348,6 +358,7 @@ export const LocationSetupScreen: React.FC = () => {
                 placeholder="Search for your area..."
                 value={searchQuery}
                 onChangeText={text => {
+                  isSelectionRef.current = false; // User typing -> Unlock search
                   setSearchQuery(text);
                   if (text.length === 0) setShowPredictions(false);
                 }}
@@ -378,7 +389,7 @@ export const LocationSetupScreen: React.FC = () => {
                       </Text>
                     </TouchableOpacity>
                   )}
-                  keyboardShouldPersistTaps="handled"
+                  keyboardShouldPersistTaps="always"
                 />
               </View>
             )}
