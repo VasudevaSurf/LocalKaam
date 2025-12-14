@@ -1,94 +1,313 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, SafeAreaView, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  SafeAreaView,
+  Alert,
+  Platform,
+  PermissionsAndroid,
+  Dimensions,
+  StyleSheet,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  TextInput,
+  FlatList,
+  ScrollView,
+} from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import MapView, { Region } from 'react-native-maps';
+import Geolocation from '@react-native-community/geolocation';
+
 import { RootStackParamList } from '../../../navigation/types';
 import { styles } from './LocationSetupScreen.styles';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Header } from '../../../components/common/Header';
 import { useAuth } from '../../../context/AuthContext';
+import * as api from '../../../services/api';
+import { colors as COLORS } from '../../../theme';
 
 type LocationSetupScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   'LocationSetup'
 >;
 
-// Define a specific route prop since we are passing params
 type LocationSetupScreenRouteProp = RouteProp<
   { LocationSetup: { name: string; bio: string; profileImage?: string } },
   'LocationSetup'
 >;
 
+const { width } = Dimensions.get('window');
+const ASPECT_RATIO = width / (width * 1.2);
+const LATITUDE_DELTA = 0.005; // Closer zoom for precision
+const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
+
+// Custom Debounce Hook
+function useDebounce(value: any, delay: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
+
 export const LocationSetupScreen: React.FC = () => {
   const navigation = useNavigation<LocationSetupScreenNavigationProp>();
   const route = useRoute<LocationSetupScreenRouteProp>();
   const { name, bio, profileImage } = route.params || {};
-  const { updateUser, uploadUserImage, user } = useAuth();
+  const { updateUser, uploadUserImage } = useAuth();
 
-  const [city, setCity] = useState('');
+  const mapRef = useRef<MapView>(null);
+
+  const [region, setRegion] = useState<Region>({
+    latitude: 20.5937,
+    longitude: 78.9629,
+    latitudeDelta: 10,
+    longitudeDelta: 10,
+  });
+
+  // Detailed Address State
+  const [houseNo, setHouseNo] = useState('');
   const [area, setArea] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [pincode, setPincode] = useState('');
+  const [formattedAddress, setFormattedAddress] = useState('');
 
-  const handleDetectLocation = () => {
-    setLoading(true);
-    // Simulate GPS detection
-    setTimeout(() => {
-      setCity('Ludhiana');
-      setArea('Model Town');
-      setLoading(false);
-    }, 1500);
+  const [loading, setLoading] = useState(false); // For Save button
+  const [addressLoading, setAddressLoading] = useState(false); // For Address Fetch
+  const [detecting, setDetecting] = useState(false); // For "Detect Location"
+
+  // Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [predictions, setPredictions] = useState<any[]>([]);
+  const [showPredictions, setShowPredictions] = useState(false);
+  const debouncedSearch = useDebounce(searchQuery, 500);
+  const isSelectionRef = useRef(false); // Track if query update is from selection
+
+  // Map Center Tracking
+  const [centerCoord, setCenterCoord] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const debouncedCenter = useDebounce(centerCoord, 800);
+
+  // Fetch Address on Map Drag Stop
+  useEffect(() => {
+    // Only fetch if NOT currently showing predictions (user dragging map manually)
+    // and if we aren't in the middle of a "selection" flow ideally, but debouncing helps.
+    if (debouncedCenter && !showPredictions && !isSelectionRef.current) {
+      setAddressLoading(true);
+      fetchAddress(debouncedCenter.latitude, debouncedCenter.longitude);
+    }
+    // Reset selection ref after some time or just rely on predictions closed
+    if (isSelectionRef.current) {
+      setTimeout(() => {
+        isSelectionRef.current = false;
+      }, 1000); // Debounce guard
+    }
+  }, [debouncedCenter]);
+
+  // Fetch Autocomplete Predictions
+  useEffect(() => {
+    if (isSelectionRef.current) {
+      // Skip search if we just selected an item
+      return;
+    }
+    if (debouncedSearch && debouncedSearch.length > 2) {
+      fetchPredictions(debouncedSearch);
+    } else {
+      setPredictions([]);
+      setShowPredictions(false);
+    }
+  }, [debouncedSearch]);
+
+  const fetchPredictions = async (query: string) => {
+    const results = await api.searchPlaces(query);
+    setPredictions(results);
+    setShowPredictions(true);
+  };
+
+  const fetchAddress = async (lat: number, lng: number) => {
+    try {
+      const data = await api.reverseGeocode(lat, lng);
+      // Backend returns: formattedAddress, city, state, area, pincode
+      if (data) {
+        setFormattedAddress(data.formattedAddress || '');
+        setCity(data.city || '');
+        setState(data.state || '');
+        setArea(data.area || '');
+        setPincode(data.pincode || '');
+      }
+    } catch (error) {
+      console.error('Reverse Geocode Error', error);
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
+  const onRegionChangeComplete = (newRegion: Region) => {
+    // This fires after animateToRegion too.
+    setCenterCoord({
+      latitude: newRegion.latitude,
+      longitude: newRegion.longitude,
+    });
+  };
+
+  const onRegionChange = () => {
+    // Optional: Set loading true immediately on drag start?
+    // Might be too flickering. Let's stick to debounced fetch.
+  };
+
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  const handlePredictionPress = async (
+    placeId: string,
+    description: string,
+  ) => {
+    isSelectionRef.current = true; // Block auto-search
+    setSearchQuery(description);
+    setShowPredictions(false);
+    setPredictions([]); // Clear predictions immediately
+
+    setAddressLoading(true); // Show loading feedback
+
+    try {
+      const details = await api.getPlaceDetails(placeId);
+
+      if (details && details.lat && details.lng) {
+        // IMMEDIATE UPDATE with details from Place API
+        setCity(details.city || '');
+        setState(details.state || '');
+        setArea(details.area || '');
+        setPincode(details.pincode || '');
+        setFormattedAddress(details.formattedAddress || description);
+
+        const { lat, lng } = details;
+
+        // Move the map
+        const newRegion = {
+          latitude: lat,
+          longitude: lng,
+          latitudeDelta: LATITUDE_DELTA,
+          longitudeDelta: LONGITUDE_DELTA,
+        };
+
+        setRegion(newRegion);
+        mapRef.current?.animateToRegion(newRegion, 1000);
+
+        setCenterCoord({ latitude: lat, longitude: lng });
+      } else {
+        Alert.alert('Error', 'Could not fetch location details.');
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to load location.');
+    } finally {
+      setAddressLoading(false);
+      // Ensure manual drag re-enables
+      setTimeout(() => {
+        isSelectionRef.current = false;
+      }, 1500);
+    }
+  };
+
+  const requestLocationPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        );
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          getCurrentLocation();
+        }
+      } catch (err) {
+        console.warn(err);
+      }
+    } else {
+      getCurrentLocation();
+    }
+  };
+
+  const getCurrentLocation = () => {
+    setDetecting(true);
+    Geolocation.getCurrentPosition(
+      position => {
+        const { latitude, longitude } = position.coords;
+        const newRegion = {
+          latitude,
+          longitude,
+          latitudeDelta: LATITUDE_DELTA,
+          longitudeDelta: LONGITUDE_DELTA,
+        };
+        setRegion(newRegion);
+        mapRef.current?.animateToRegion(newRegion, 1000);
+        setDetecting(false);
+      },
+      error => {
+        console.error(error);
+        setDetecting(false);
+        Alert.alert('Error', 'Could not detect location.');
+      },
+      { enableHighAccuracy: false, timeout: 20000, maximumAge: 1000 },
+    );
   };
 
   const handleContinue = async () => {
-    if (!city.trim()) {
-      Alert.alert('Error', 'Please enter your city');
-      return;
+    if (!city.trim() || !formattedAddress.trim()) {
+      // Validating required fields
     }
-    if (!area.trim()) {
-      Alert.alert('Error', 'Please enter your area');
+
+    const fullAddress = `${houseNo ? houseNo + ', ' : ''}${formattedAddress}`;
+
+    if (!city.trim()) {
+      Alert.alert(
+        'Required',
+        'City is missing. Please select a valid location.',
+      );
       return;
     }
 
     setLoading(true);
     try {
-      // 1. Upload Profile Image if exists
       let profileImageUrl = profileImage;
       if (profileImage && !profileImage.startsWith('http')) {
-        // It's a local URI, upload it
-        const uploadResult = await uploadUserImage(profileImage);
-        if (uploadResult) {
-          profileImageUrl = uploadResult;
-        } else {
-          // Upload failed, maybe show a warning but proceed
-          console.log('Image upload failed, proceeding with profile update');
-        }
+        profileImageUrl = await uploadUserImage(profileImage);
       }
 
-      // 2. Update User Profile with all data
       const profileData = {
         name,
         bio,
-        city: { name: city, state: 'Punjab' }, // Hardcoded state for now or derive
         profileImage: profileImageUrl,
+        // New Structure
+        location: {
+          address: fullAddress,
+          area: area || city,
+          city,
+          state,
+          pincode,
+          coordinates: centerCoord
+            ? { lat: centerCoord.latitude, lng: centerCoord.longitude }
+            : undefined,
+        },
+        // Legacy Support
+        city: { name: city, state: state || 'Punjab' },
+        address: fullAddress,
         userType: 'customer',
       };
 
       const success = await updateUser(profileData);
-
       if (success) {
-        console.log('Profile setup complete, navigating to Main');
-        // Explicitly navigate to Main stack to ensure user doesn't get stuck
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Main' as any }],
-        });
+        navigation.reset({ index: 0, routes: [{ name: 'Main' as any }] });
       } else {
-        Alert.alert('Error', 'Failed to save profile. Please try again.');
+        Alert.alert('Error', 'Failed to save profile.');
       }
     } catch (error) {
-      console.error('Profile Save Error:', error);
-      Alert.alert('Error', 'An unexpected error occurred.');
+      console.error(error);
+      Alert.alert('Error', 'Something went wrong.');
     } finally {
       setLoading(false);
     }
@@ -96,88 +315,279 @@ export const LocationSetupScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header
-        title="Set Your Location"
-        leftIcon={<Text style={styles.backIcon}>←</Text>}
-      />
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
       >
-        {/* Icon */}
-        <View style={styles.iconContainer}>
-          <Text style={styles.icon}>📍</Text>
-        </View>
-
-        {/* Title & Description */}
-        <View style={styles.textContainer}>
-          <Text style={styles.title}>Where are you located?</Text>
-          <Text style={styles.description}>
-            We'll show you workers available in your area
-          </Text>
-        </View>
-
-        {/* Auto Detect Button */}
-        <Button
-          title="📍 Detect My Location"
-          variant="outline"
-          size="large"
-          onPress={handleDetectLocation}
-          loading={loading && !city} // Only show loading on button if detecting
-          fullWidth
-          style={styles.detectButton}
-        />
-
-        {/* Divider */}
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>OR</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        {/* Manual Entry */}
-        <View style={styles.inputsContainer}>
-          <Input
-            label="City"
-            placeholder="Enter your city"
-            value={city}
-            onChangeText={setCity}
-            required
+        {/* Map Section (Top Half) */}
+        <View style={{ height: '50%', width: '100%' }}>
+          <MapView
+            ref={mapRef}
+            style={StyleSheet.absoluteFillObject}
+            initialRegion={region}
+            onRegionChangeComplete={onRegionChangeComplete}
+            showsUserLocation={false}
+            showsMyLocationButton={false}
           />
 
-          <Input
-            label="Area / Locality"
-            placeholder="Enter your area"
-            value={area}
-            onChangeText={setArea}
-            required
-          />
+          {/* Header */}
+          <View style={localStyles.headerOverlay}>
+            <Header
+              title="Set Location"
+              leftIcon={<Text style={styles.backIcon}>←</Text>}
+              onLeftPress={() => navigation.goBack()}
+              transparent
+            />
+          </View>
+
+          {/* Search Bar Overlay */}
+          <View style={localStyles.searchContainer}>
+            <View style={localStyles.searchBox}>
+              <Text style={{ marginRight: 8 }}>🔍</Text>
+              <TextInput
+                placeholder="Search for your area..."
+                value={searchQuery}
+                onChangeText={text => {
+                  setSearchQuery(text);
+                  if (text.length === 0) setShowPredictions(false);
+                }}
+                style={localStyles.searchInput}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Text style={{ color: '#999' }}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Predictions List */}
+            {showPredictions && predictions.length > 0 && (
+              <View style={localStyles.predictionsList}>
+                <FlatList
+                  data={predictions}
+                  keyExtractor={item => item.place_id}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={localStyles.predictionItem}
+                      onPress={() =>
+                        handlePredictionPress(item.place_id, item.description)
+                      }
+                    >
+                      <Text style={localStyles.predictionText}>
+                        {item.description}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  keyboardShouldPersistTaps="handled"
+                />
+              </View>
+            )}
+          </View>
+
+          {/* Center Marker */}
+          <View style={localStyles.markerFixed}>
+            <Text style={{ fontSize: 40, marginBottom: 40 }}>📍</Text>
+          </View>
+
+          {/* Detect Button */}
+          <TouchableOpacity
+            style={localStyles.detectButton}
+            onPress={getCurrentLocation}
+            disabled={detecting}
+          >
+            <Text style={localStyles.detectButtonText}>
+              {detecting ? 'Locating...' : '🎯 Detect My Location'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoIcon}>ℹ️</Text>
-          <Text style={styles.infoText}>
-            Your location helps us show you the most relevant workers near you.
-            You can change this anytime.
+        {/* Address Form (Bottom Half) */}
+        <View style={localStyles.formContainer}>
+          <Text style={styles.title}>Confirm Address</Text>
+          <Text style={[styles.description, { marginBottom: 20 }]}>
+            {formattedAddress || 'Move the map pin to select a location'}
           </Text>
-        </View>
-      </ScrollView>
 
-      {/* Fixed Bottom Button */}
-      <View style={styles.footer}>
-        <Button
-          title="Complete Setup"
-          variant="primary"
-          size="large"
-          onPress={handleContinue}
-          fullWidth
-          loading={loading && !!city} // Show loading when saving
-          disabled={!city.trim() || !area.trim()}
-        />
-      </View>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          >
+            <Text style={styles.label}>House No / Building / Floor</Text>
+            <TextInput
+              style={styles.input}
+              value={houseNo}
+              onChangeText={setHouseNo}
+              placeholder="e.g. #42, LocalKaam Tower"
+              placeholderTextColor="#999"
+              editable={!addressLoading}
+            />
+
+            <View style={{ flexDirection: 'row', gap: 16, marginTop: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Area / Sector</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    addressLoading && {
+                      opacity: 0.5,
+                      backgroundColor: '#f0f0f0',
+                    },
+                  ]}
+                  value={addressLoading ? 'Loading...' : area}
+                  onChangeText={setArea}
+                  placeholder="Locality"
+                  placeholderTextColor="#999"
+                  editable={!addressLoading}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Pincode</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    addressLoading && {
+                      opacity: 0.5,
+                      backgroundColor: '#f0f0f0',
+                    },
+                  ]}
+                  value={addressLoading ? '...' : pincode}
+                  onChangeText={setPincode}
+                  placeholder="110001"
+                  placeholderTextColor="#999"
+                  keyboardType="numeric"
+                  maxLength={6}
+                  editable={!addressLoading}
+                />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 16, marginTop: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>City</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    { backgroundColor: '#F0F0F0', color: '#666' },
+                    addressLoading && { opacity: 0.5 },
+                  ]}
+                  value={addressLoading ? 'Loading...' : city}
+                  editable={false}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>State</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    { backgroundColor: '#F0F0F0', color: '#666' },
+                    addressLoading && { opacity: 0.5 },
+                  ]}
+                  value={addressLoading ? 'Loading...' : state}
+                  editable={false}
+                />
+              </View>
+            </View>
+
+            <View style={{ marginTop: 24 }}>
+              <Button
+                title="Save & Continue"
+                variant="primary"
+                size="large"
+                onPress={handleContinue}
+                fullWidth
+                loading={loading}
+                disabled={!city || addressLoading}
+              />
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
+
+const localStyles = StyleSheet.create({
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  searchContainer: {
+    position: 'absolute',
+    top: 60, // Below header
+    left: 16,
+    right: 16,
+    zIndex: 20,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 48,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    color: '#333',
+  },
+  predictionsList: {
+    backgroundColor: 'white',
+    marginTop: 4,
+    borderRadius: 8,
+    elevation: 4,
+    maxHeight: 200,
+  },
+  predictionItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  predictionText: {
+    color: '#333',
+    fontSize: 14,
+  },
+  markerFixed: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -15,
+    marginTop: -35,
+    zIndex: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detectButton: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    elevation: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detectButtonText: {
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  formContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingTop: 16,
+    elevation: 20,
+    marginTop: -20, // Overlap map slightly
+  },
+});

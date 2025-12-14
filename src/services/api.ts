@@ -252,4 +252,41 @@ export const updateFcmToken = async (userId: string, fcmToken: string) => {
   }
 };
 
+// Location API
+export const reverseGeocode = async (lat: number, lng: number) => {
+  try {
+    const response = await api.post('/location/geocode', { lat, lng });
+    return response.data;
+  } catch (error) {
+    console.error('Error in reverse geocode:', error);
+    return null;
+  }
+};
+
+export const searchPlaces = async (query: string) => {
+  try {
+    if (!query) return [];
+    // Call our backend proxy
+    const response = await api.get('/location/autocomplete', {
+      params: { input: query },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error searching places:', error);
+    return [];
+  }
+};
+
+export const getPlaceDetails = async (placeId: string) => {
+  try {
+    const response = await api.get('/location/place-details', {
+      params: { placeId },
+    });
+    return response.data; // { lat, lng, formattedAddress }
+  } catch (error) {
+    console.error('Error fetching place details:', error);
+    return null;
+  }
+};
+
 export default api;

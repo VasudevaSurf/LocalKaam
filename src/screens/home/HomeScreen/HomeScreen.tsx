@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,16 @@ import { styles } from './HomeScreen.styles';
 import { SearchBar } from '../../../components/ui/SearchBar';
 import { Chip } from '../../../components/ui/Chip';
 import { ServiceCard } from '../../../components/common/ServiceCard';
-import { LocationPicker } from '../../../components/common/LocationPicker';
+import { LocationPicker } from '../../../components/common/LocationPircker';
 import { EmptyState } from '../../../components/common/EmptyState';
 import { LoadingState } from '../../../components/common/LoadingState';
+import { useAuth } from '../../../context/AuthContext';
+import * as api from '../../../services/api';
+import {
+  useNavigation,
+  useIsFocused,
+  useFocusEffect,
+} from '@react-navigation/native';
 
 const QUICK_CATEGORIES = [
   { id: '1', label: 'Electrician', icon: '⚡' },
@@ -87,6 +94,43 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const { user } = useAuth();
+  const navigation = useNavigation<any>();
+  const isFocused = useIsFocused();
+
+  // Check for Active Request (Background Check)
+  useEffect(() => {
+    let mounted = true;
+
+    const checkActiveRequest = async () => {
+      // Small delay to ensure navigation is ready
+      await new Promise(resolve => setTimeout(resolve as any, 500));
+
+      if (user?.id && isFocused && mounted) {
+        try {
+          console.log('[HomeScreen] Checking for active request...');
+          const request = await api.getActiveRequest(user.id);
+
+          if (request && request._id) {
+            console.log('[HomeScreen] Found active request:', request._id);
+            // Verify we are not already on the screen (though unlikely given isFocused)
+            navigation.navigate('ActiveRequest', { requestId: request._id });
+          } else {
+            console.log('[HomeScreen] No active request found');
+          }
+        } catch (error) {
+          console.log('[HomeScreen] Check failed:', error);
+        }
+      }
+    };
+
+    checkActiveRequest();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id, isFocused]);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);

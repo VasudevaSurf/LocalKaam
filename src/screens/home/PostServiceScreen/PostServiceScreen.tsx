@@ -41,6 +41,9 @@ export interface PostServiceScreenProps {
   onViewRequest: (requestId: string) => void;
   onLocationPress: () => void;
   onNotificationPress: () => void;
+  activeRequests: any[];
+  isLoading?: boolean;
+  onRefresh?: () => void;
 }
 
 export const PostServiceScreen: React.FC<PostServiceScreenProps> = ({
@@ -48,16 +51,11 @@ export const PostServiceScreen: React.FC<PostServiceScreenProps> = ({
   onViewRequest,
   onLocationPress,
   onNotificationPress,
+  activeRequests = [],
+  isLoading = false,
+  onRefresh,
 }) => {
-  const [refreshing, setRefreshing] = useState(false);
   const { user } = useAuth();
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
-  };
 
   // Get first name from full name
   const getFirstName = () => {
@@ -97,7 +95,7 @@ export const PostServiceScreen: React.FC<PostServiceScreenProps> = ({
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          <RefreshControl refreshing={isLoading} onRefresh={onRefresh} />
         }
       >
         {/* Main CTA Card */}
@@ -178,35 +176,39 @@ export const PostServiceScreen: React.FC<PostServiceScreenProps> = ({
         </View>
 
         {/* Active Requests */}
-        {MOCK_ACTIVE_REQUESTS.length > 0 && (
+        {activeRequests.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Your Active Requests</Text>
               <Badge
-                label={`${MOCK_ACTIVE_REQUESTS.length}`}
+                label={`${activeRequests.length}`}
                 variant="primary"
                 size="small"
               />
             </View>
 
-            {MOCK_ACTIVE_REQUESTS.map(request => (
+            {activeRequests.map(request => (
               <Card
-                key={request.id}
+                key={request._id}
                 style={styles.requestCard}
-                onPress={() => onViewRequest(request.id)}
+                onPress={() => onViewRequest(request._id)}
               >
                 <View style={styles.requestHeader}>
                   <View style={styles.requestHeaderLeft}>
-                    <Text style={styles.requestService}>{request.service}</Text>
-                    <Text style={styles.requestTime}>{request.postedTime}</Text>
+                    <Text style={styles.requestService}>
+                      {request.serviceType}
+                    </Text>
+                    <Text style={styles.requestTime}>
+                      {new Date(request.createdAt).toLocaleDateString()}
+                    </Text>
                   </View>
                   <Badge
                     label={
                       request.status === 'pending'
                         ? 'Pending'
                         : request.status === 'quoted'
-                        ? `${request.quotesCount} Quotes`
-                        : 'Accepted'
+                        ? `${request.quotesCount || 0} Quotes`
+                        : request.status
                     }
                     variant={
                       request.status === 'pending'
@@ -226,10 +228,10 @@ export const PostServiceScreen: React.FC<PostServiceScreenProps> = ({
                 <View style={styles.requestFooter}>
                   <View style={styles.requestBudget}>
                     <Text style={styles.budgetIcon}>💰</Text>
-                    <Text style={styles.budgetText}>{request.budget}</Text>
+                    <Text style={styles.budgetText}>₹{request.budget}</Text>
                   </View>
                   <TouchableOpacity
-                    onPress={() => onViewRequest(request.id)}
+                    onPress={() => onViewRequest(request._id)}
                     style={styles.viewButton}
                   >
                     <Text style={styles.viewButtonText}>View Details →</Text>

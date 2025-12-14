@@ -34,9 +34,6 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const AppNavigator = () => {
   const { isAuthenticated, isInitialized, user } = useAuth();
-  const [checkingActiveRequest, setCheckingActiveRequest] = useState(true);
-  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
-
   // Notification Handling
   const navigationRef = React.useRef<any>(null);
   const [pendingNotification, setPendingNotification] = useState<any>(null);
@@ -95,52 +92,7 @@ export const AppNavigator = () => {
     };
   }, [isAuthenticated, isInitialized, pendingNotification]);
 
-  // Check for active request when user is authenticated
-  useEffect(() => {
-    const checkForActiveRequest = async (retryCount = 0) => {
-      if (user?.id && user.id !== 'temp_id' && isAuthenticated) {
-        try {
-          console.log('[AppNavigator] Checking for active request...');
-          const request = await api.getActiveRequest(user.id);
-          if (request && request._id) {
-            console.log('[AppNavigator] Active request found:', request._id);
-            setActiveRequestId(request._id);
-          } else {
-            console.log('[AppNavigator] No active request found');
-          }
-        } catch (error) {
-          console.error(
-            `[AppNavigator] Error checking active request (Attempt ${
-              retryCount + 1
-            }):`,
-            error,
-          );
-          // Retry logic for startup network race conditions
-          if (retryCount < 3) {
-            const timeout = Math.pow(2, retryCount) * 1000;
-            console.log(`[AppNavigator] Retrying in ${timeout}ms...`);
-            setTimeout(() => {
-              if (isAuthenticated && checkingActiveRequest) {
-                checkForActiveRequest(retryCount + 1);
-              }
-            }, timeout);
-            return; // Don't stop checking yet
-          }
-        }
-      }
-      setCheckingActiveRequest(false);
-    };
-
-    if (isInitialized && !checkingActiveRequest) {
-      setCheckingActiveRequest(true);
-    }
-
-    if (isInitialized) {
-      checkForActiveRequest();
-    }
-  }, [user?.id, isAuthenticated, isInitialized]);
-
-  if (!isInitialized || (isAuthenticated && checkingActiveRequest)) {
+  if (!isInitialized) {
     return <SplashScreen />;
   }
 
@@ -171,26 +123,12 @@ export const AppNavigator = () => {
           />
         ) : (
           <>
-            {activeRequestId ? (
-              // Show ActiveRequest as initial screen if there's an active request
-              <>
-                <Stack.Screen
-                  name="ActiveRequest"
-                  component={ActiveRequestScreen}
-                  initialParams={{ requestId: activeRequestId }}
-                />
-                <Stack.Screen name="Main" component={MainTabNavigator} />
-              </>
-            ) : (
-              // Show Main tabs as initial screen if no active request
-              <>
-                <Stack.Screen name="Main" component={MainTabNavigator} />
-                <Stack.Screen
-                  name="ActiveRequest"
-                  component={ActiveRequestScreen}
-                />
-              </>
-            )}
+            {/* Main Application Flow */}
+            <Stack.Screen name="Main" component={MainTabNavigator} />
+            <Stack.Screen
+              name="ActiveRequest"
+              component={ActiveRequestScreen}
+            />
 
             {/* Feature Screens */}
             <Stack.Screen

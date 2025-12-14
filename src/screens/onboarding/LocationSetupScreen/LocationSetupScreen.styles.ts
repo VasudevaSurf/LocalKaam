@@ -91,4 +91,21 @@ export const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.borderLight,
   },
+  label: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+    fontWeight: '600',
+  },
+  input: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: colors.textPrimary,
+    fontSize: 14,
+    height: 48,
+  },
 });
